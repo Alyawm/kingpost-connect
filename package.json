@@ -1,0 +1,32 @@
+{
+  "name": "kingpost-connect",
+  "private": true,
+  "version": "0.0.1",
+  "description": "Structural collaboration desktop: IFC review, revision comparison, analysis overlay, drawing linking.",
+  "license": "SEE LICENSE IN LICENSE",
+  "packageManager": "pnpm@12.10.1",
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "dev": "pnpm --filter @kingpost/desktop dev",
+    "dev:web": "pnpm --filter @kingpost/desktop dev:web",
+    "tauri": "pnpm --filter @kingpost/desktop tauri",
+    "build": "pnpm -r build",
+    "typecheck": "pnpm -r typecheck",
+    "lint": "eslint . && prettier --check .",
+    "format": "prettier --write . && cargo fmt",
+    "test": "pnpm -r test",
+    "check": "pnpm typecheck && pnpm lint && pnpm test && cargo fmt --check && cargo clippy --workspace --all-targets -- -D warnings && cargo test --workspace"
+  },
+  "devDependencies": {
+    "@eslint/js": "^9.31.0",
+    "eslint": "^9.31.0",
+    "eslint-plugin-react-hooks": "^5.2.0",
+    "eslint-plugin-react-refresh": "^0.4.20",
+    "globals": "^16.3.0",
+    "prettier": "^3.6.2",
+    "typescript": "^5.8.3",
+    "typescript-eslint": "^8.38.0"
+  }
+}

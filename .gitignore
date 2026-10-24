@@ -22,7 +22,10 @@ apps/desktop/src-tauri/target/
 .DS_Store
 Thumbs.db
 
-# Large sample files are attached to GitHub Releases, not committed
+# Large sample files are attached to GitHub Releases, not committed.
+# Project-specific models never leave the machine; drop them in samples/private/ or Example Files/.
+samples/private/
+/Example Files/
 samples/**/*.ifc
 samples/**/*.pdf
 samples/**/*.xlsx

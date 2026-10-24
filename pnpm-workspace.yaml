@@ -1,0 +1,7 @@
+packages:
+  - apps/*
+  - packages/*
+
+# Dependencies whose install scripts may run. esbuild's script only verifies its binary.
+allowBuilds:
+  esbuild: true
