@@ -2,7 +2,9 @@ import { useMemo, type ReactNode } from 'react';
 import { Panel, PanelBody, PanelHeader } from '@kingpost/ui';
 import { useViewer } from '../state/viewer';
 import { useModel } from '../state/model';
-import { formatQuantity } from '../lib/format';
+import { useReview } from '../state/review';
+import { STAGE_COLORS, type Stage } from '../state/view';
+import { formatIsoDate, formatQuantity } from '../lib/format';
 import type { PropertyOut } from '../lib/ipc';
 
 export function Inspector() {
@@ -10,6 +12,8 @@ export function Inspector() {
   const selectedId = useModel((s) => s.selectedId);
   const summary = useModel((s) => (selectedId === null ? null : (s.byId.get(selectedId) ?? null)));
   const details = useModel((s) => s.details);
+  const selectedCount = useModel((s) => s.selectedIds.size);
+  const status = useReview((s) => (summary ? s.statuses.get(summary.global_id) : undefined));
 
   const psets = useMemo(() => groupBySet(details?.properties ?? []), [details]);
 
@@ -25,7 +29,20 @@ export function Inspector() {
               </div>
               <div className="font-mono text-[11px] text-fg-muted">
                 {summary?.ifc_type ?? 'IfcProduct'} · #{selectedId}
+                {selectedCount > 1 && ` · ${selectedCount} selected`}
               </div>
+              {status && (
+                <div className="mt-1 flex items-center gap-1.5 text-[11px]">
+                  <span
+                    className="h-2 w-2 rounded-sm"
+                    style={{ background: STAGE_COLORS[status.stage as Stage] }}
+                  />
+                  <span>{status.stage}</span>
+                  <span className="text-fg-muted">
+                    · {status.set_by}, {formatIsoDate(status.set_at)}
+                  </span>
+                </div>
+              )}
             </div>
             <Section title="Element">
               <Field label="Name" value={summary?.name} />

@@ -2,6 +2,7 @@ import { useCallback } from 'react';
 import {
   Viewport,
   createSampleFrame,
+  type PickModifiers,
   type PickResult,
   type PointPick,
   type ViewportHandle,
@@ -30,9 +31,9 @@ export function Workspace() {
   );
 
   const onSelect = useCallback(
-    (hit: PickResult | null) => {
+    (hit: PickResult | null, modifiers: PickModifiers) => {
       setSelection(hit);
-      useModel.getState().onPick(hit);
+      useModel.getState().onPick(hit, modifiers);
     },
     [setSelection],
   );

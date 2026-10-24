@@ -1,4 +1,4 @@
-import { Eraser, Eye, Focus, Ruler } from 'lucide-react';
+import { Eraser, Eye, Focus, PenLine, Ruler } from 'lucide-react';
 import type { ViewDirection } from '@kingpost/viewer';
 import { IconButton, cn } from '@kingpost/ui';
 import { useViewer } from '../state/viewer';
@@ -22,6 +22,8 @@ export function ViewportToolbar() {
   const pending = useView((s) => s.pendingPoint);
   const measurements = useView((s) => s.measurements);
   const clearMeasurements = useView((s) => s.clearMeasurements);
+  const markups = useView((s) => s.markups);
+  const clearMarkups = useView((s) => s.clearMarkups);
 
   return (
     <div className="pointer-events-none absolute right-3 top-3 flex flex-col items-end gap-2">
@@ -57,8 +59,24 @@ export function ViewportToolbar() {
           >
             <Ruler size={14} />
           </IconButton>
-          {measurements.length > 0 && (
-            <IconButton label="Clear measurements" size="sm" onClick={clearMeasurements}>
+          <IconButton
+            label={tool === 'markup' ? 'Stop drawing (Esc)' : 'Draw markup lines'}
+            size="sm"
+            active={tool === 'markup'}
+            disabled={!handle}
+            onClick={() => setTool(tool === 'markup' ? 'select' : 'markup')}
+          >
+            <PenLine size={14} />
+          </IconButton>
+          {(measurements.length > 0 || markups.length > 0) && (
+            <IconButton
+              label="Clear measurements and markups"
+              size="sm"
+              onClick={() => {
+                clearMeasurements();
+                clearMarkups();
+              }}
+            >
               <Eraser size={14} />
             </IconButton>
           )}
@@ -72,9 +90,11 @@ export function ViewportToolbar() {
           </IconButton>
         </div>
       </div>
-      {tool === 'measure' && (
+      {tool !== 'select' && (
         <div className="pointer-events-none rounded-md border border-edge bg-surface/90 px-2 py-1 text-[11px] text-fg-muted shadow">
-          {pending ? 'Click the second point' : 'Click the first point on the model'}
+          {pending
+            ? 'Click the second point'
+            : `Click the first point on the model${tool === 'markup' ? ' to draw a line' : ''}`}
         </div>
       )}
       {measurements.length > 0 && (

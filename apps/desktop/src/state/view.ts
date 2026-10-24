@@ -1,18 +1,20 @@
 import { create } from 'zustand';
 import {
+  Vector3,
+  createLineObject,
   createMeasurementObject,
   measure,
   type Measurement,
   type PointPick,
 } from '@kingpost/viewer';
-import type { ElementSummary } from '../lib/ipc';
+import type { ElementSummary, Triple } from '../lib/ipc';
 import { log } from './log';
 import { useModel } from './model';
 import { useViewer } from './viewer';
 
 export type SectionAxis = 'x' | 'y' | 'z';
-export type ColorBy = 'none' | 'type' | 'material' | 'storey';
-export type Tool = 'select' | 'measure';
+export type ColorBy = 'none' | 'type' | 'material' | 'storey' | 'status';
+export type Tool = 'select' | 'measure' | 'markup';
 
 export interface Section {
   enabled: boolean;
@@ -31,21 +33,33 @@ export interface LegendEntry {
   ids: number[];
 }
 
+/** A markup line in viewer coordinates (converted to IFC when it joins a viewpoint). */
+export interface MarkupLine {
+  start: Triple;
+  end: Triple;
+}
+
 interface ViewState {
   tool: Tool;
   section: Section;
   colorBy: ColorBy;
   legend: LegendEntry[];
-  /** First point of a measurement in progress, if any. */
+  /** First point of a measurement or markup in progress, if any. */
   pendingPoint: PointPick | null;
   measurements: Measurement[];
+  markups: MarkupLine[];
   setTool(tool: Tool): void;
   pickPoint(pick: PointPick): void;
   clearMeasurements(): void;
+  clearMarkups(): void;
+  /** Draws lines (viewer coordinates) as markups, e.g. from an applied viewpoint. */
+  addMarkups(lines: MarkupLine[]): void;
   setSection(patch: Partial<Section>): void;
   /** Places a plan cut just below the top of a storey and looks down on it. */
   planOfStorey(storey: string): void;
   setColorBy(mode: ColorBy): void;
+  /** Re-applies the current colouring, e.g. after statuses changed. */
+  refreshColors(): void;
   reset(): void;
 }
 
@@ -65,7 +79,25 @@ export const PALETTE = [
   '#8fd3b6',
 ];
 
+export const STAGES = ['modelled', 'analysed', 'designed', 'checked', 'approved'] as const;
+export type Stage = (typeof STAGES)[number];
+
+export const STAGE_COLORS: Record<Stage, string> = {
+  modelled: '#8a94a6',
+  analysed: '#c084fc',
+  designed: '#5b9dff',
+  checked: '#f5b941',
+  approved: '#3ccf7a',
+};
+
+const NO_STATUS = '— not set —';
 const defaultSection: Section = { enabled: false, axis: 'y', position: 0, flip: false };
+
+/** Supplies element statuses (GlobalId → stage) to the colouring without a store cycle. */
+let statusSource: () => ReadonlyMap<string, string> = () => new Map();
+export function setStatusSource(source: () => ReadonlyMap<string, string>): void {
+  statusSource = source;
+}
 
 export const useView = create<ViewState>((set, get) => ({
   tool: 'select',
@@ -74,20 +106,31 @@ export const useView = create<ViewState>((set, get) => ({
   legend: [],
   pendingPoint: null,
   measurements: [],
+  markups: [],
 
   setTool: (tool) => {
     set({ tool, pendingPoint: null });
-    useViewer.getState().handle?.setPickMode(tool === 'measure' ? 'point' : 'select');
+    useViewer.getState().handle?.setPickMode(tool === 'select' ? 'select' : 'point');
   },
 
   pickPoint: (pick) => {
-    const { pendingPoint, measurements } = get();
+    const { pendingPoint, measurements, markups, tool } = get();
     if (!pendingPoint) {
       set({ pendingPoint: pick });
       return;
     }
+    const handle = useViewer.getState().handle;
+    if (tool === 'markup') {
+      handle?.addOverlay(createLineObject(pendingPoint.point, pick.point));
+      const line: MarkupLine = {
+        start: pendingPoint.point.toArray() as Triple,
+        end: pick.point.toArray() as Triple,
+      };
+      set({ pendingPoint: null, markups: [...markups, line] });
+      return;
+    }
     const result = measure(pendingPoint.point, pick.point);
-    useViewer.getState().handle?.addOverlay(createMeasurementObject(result));
+    handle?.addOverlay(createMeasurementObject(result));
     set({ pendingPoint: null, measurements: [...measurements, result] });
     const d = result.delta;
     log.info(
@@ -96,8 +139,28 @@ export const useView = create<ViewState>((set, get) => ({
   },
 
   clearMeasurements: () => {
-    useViewer.getState().handle?.clearOverlay();
+    const handle = useViewer.getState().handle;
+    handle?.clearOverlay();
+    // Markups live in the same overlay; redraw the ones that stay.
+    for (const line of get().markups) {
+      handle?.addOverlay(createLineObject(vector(line.start), vector(line.end)));
+    }
     set({ measurements: [], pendingPoint: null });
+  },
+
+  clearMarkups: () => {
+    const handle = useViewer.getState().handle;
+    handle?.clearOverlay();
+    for (const m of get().measurements) handle?.addOverlay(createMeasurementObject(m));
+    set({ markups: [], pendingPoint: null });
+  },
+
+  addMarkups: (lines) => {
+    const handle = useViewer.getState().handle;
+    for (const line of lines) {
+      handle?.addOverlay(createLineObject(vector(line.start), vector(line.end)));
+    }
+    set({ markups: [...get().markups, ...lines] });
   },
 
   setSection: (patch) => {
@@ -129,7 +192,7 @@ export const useView = create<ViewState>((set, get) => ({
 
   setColorBy: (mode) => {
     const { model, elements } = useModel.getState();
-    const legend = mode === 'none' ? [] : buildLegend(elements, mode);
+    const legend = mode === 'none' ? [] : buildLegend(elements, mode, statusSource());
     set({ colorBy: mode, legend });
     if (!model) return;
     if (mode === 'none') {
@@ -142,6 +205,11 @@ export const useView = create<ViewState>((set, get) => ({
     useViewer.getState().handle?.render();
   },
 
+  refreshColors: () => {
+    const mode = get().colorBy;
+    if (mode !== 'none') get().setColorBy(mode);
+  },
+
   reset: () => {
     const handle = useViewer.getState().handle;
     set({
@@ -151,6 +219,7 @@ export const useView = create<ViewState>((set, get) => ({
       legend: [],
       pendingPoint: null,
       measurements: [],
+      markups: [],
     });
     handle?.setSection(null);
     handle?.clearOverlay();
@@ -158,14 +227,19 @@ export const useView = create<ViewState>((set, get) => ({
   },
 }));
 
-// A new or cleared model starts with no section, tints or measurements.
+// A new or cleared model starts with no section, tints, measurements or markups.
 useModel.subscribe((state, previous) => {
   if (state.model !== previous.model) useView.getState().reset();
 });
 
+function vector(t: Triple): Vector3 {
+  return new Vector3(t[0], t[1], t[2]);
+}
+
 export function buildLegend(
   elements: ElementSummary[],
   mode: Exclude<ColorBy, 'none'>,
+  statuses: ReadonlyMap<string, string> = new Map(),
 ): LegendEntry[] {
   const groups = new Map<string, number[]>();
   for (const element of elements) {
@@ -175,8 +249,22 @@ export function buildLegend(
         ? element.ifc_type
         : mode === 'material'
           ? (element.material ?? '— no material —')
-          : (element.storey ?? '— no storey —');
+          : mode === 'storey'
+            ? (element.storey ?? '— no storey —')
+            : (statuses.get(element.global_id) ?? NO_STATUS);
     groups.set(key, [...(groups.get(key) ?? []), element.express_id]);
+  }
+  if (mode === 'status') {
+    // Fixed order and colours: the pipeline reads left to right.
+    return [...STAGES, NO_STATUS]
+      .filter((stage) => groups.has(stage))
+      .map((stage) => ({
+        key: stage,
+        label: stage,
+        color: stage === NO_STATUS ? '#4a5260' : STAGE_COLORS[stage as Stage],
+        count: groups.get(stage)?.length ?? 0,
+        ids: groups.get(stage) ?? [],
+      }));
   }
   return [...groups.entries()]
     .sort(([, a], [, b]) => b.length - a.length)

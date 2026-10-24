@@ -8,6 +8,8 @@ export type PanelSide = 'left' | 'right' | 'bottom';
 
 interface UiState {
   theme: Theme;
+  /** Name recorded on issues, comments and status changes. */
+  author: string;
   section: Section;
   leftOpen: boolean;
   rightOpen: boolean;
@@ -15,6 +17,7 @@ interface UiState {
   paletteOpen: boolean;
   setTheme(theme: Theme): void;
   toggleTheme(): void;
+  setAuthor(author: string): void;
   setSection(section: Section): void;
   togglePanel(side: PanelSide): void;
   setPalette(open: boolean): void;
@@ -31,6 +34,7 @@ export const useUi = create<UiState>()(
   persist(
     (set, get) => ({
       theme: 'dark',
+      author: '',
       section: 'explorer',
       leftOpen: true,
       rightOpen: true,
@@ -38,6 +42,7 @@ export const useUi = create<UiState>()(
       paletteOpen: false,
       setTheme: (theme) => set({ theme }),
       toggleTheme: () => set({ theme: get().theme === 'dark' ? 'light' : 'dark' }),
+      setAuthor: (author) => set({ author }),
       setSection: (section) => {
         // Clicking the active rail item folds the side panel, like most editors do.
         if (get().section === section) set({ leftOpen: !get().leftOpen });
@@ -50,6 +55,7 @@ export const useUi = create<UiState>()(
       name: 'kingpost.ui',
       partialize: (s) => ({
         theme: s.theme,
+        author: s.author,
         leftOpen: s.leftOpen,
         rightOpen: s.rightOpen,
         bottomOpen: s.bottomOpen,

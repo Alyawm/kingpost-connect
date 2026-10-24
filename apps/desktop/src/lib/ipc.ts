@@ -210,3 +210,211 @@ export function viewRename(id: string, name: string): Promise<boolean> {
 export function viewDelete(id: string): Promise<boolean> {
   return invoke<boolean>('view_delete', { id });
 }
+
+// ---- Review: issues, comments, viewpoints, element status, BCF ----
+
+export type Triple = [number, number, number];
+
+export interface IssueRow {
+  id: string;
+  bcf_guid: string;
+  title: string;
+  description: string | null;
+  topic_type: string;
+  status: string;
+  priority: string | null;
+  assignee: string | null;
+  due: string | null;
+  labels: string[];
+  stage: string | null;
+  idx: number | null;
+  created_by: string;
+  created_at: string;
+  modified_by: string | null;
+  modified_at: string | null;
+  comment_count: number;
+  viewpoint_count: number;
+  element_count: number;
+}
+
+export interface NewIssue {
+  title: string;
+  description?: string | null;
+  topic_type?: string | null;
+  status?: string | null;
+  priority?: string | null;
+  assignee?: string | null;
+  due?: string | null;
+  labels: string[];
+  stage?: string | null;
+  created_by: string;
+}
+
+/** Omit a field to leave it alone; send null to clear it. */
+export interface IssuePatch {
+  title?: string;
+  description?: string | null;
+  topic_type?: string;
+  status?: string;
+  priority?: string | null;
+  assignee?: string | null;
+  due?: string | null;
+  labels?: string[];
+  stage?: string | null;
+}
+
+export interface CommentRow {
+  id: string;
+  issue_id: string;
+  author: string;
+  text: string;
+  viewpoint_id: string | null;
+  created_at: string;
+}
+
+export interface ViewpointCamera {
+  view_point: Triple;
+  direction: Triple;
+  up: Triple;
+  field_of_view: number;
+  aspect_ratio: number;
+}
+
+export interface ViewpointComponents {
+  selection: string[];
+  default_visibility: boolean;
+  exceptions: string[];
+  coloring: { color: string; ifc_guids: string[] }[];
+}
+
+export interface ViewpointLine {
+  start: Triple;
+  end: Triple;
+}
+
+export interface ViewpointClipping {
+  location: Triple;
+  direction: Triple;
+}
+
+export interface NewViewpointInput {
+  camera: ViewpointCamera;
+  components: ViewpointComponents;
+  lines: ViewpointLine[];
+  clipping: ViewpointClipping[];
+  snapshot: string | null;
+}
+
+export interface ViewpointRow {
+  id: string;
+  issue_id: string;
+  guid: string;
+  camera_json: string;
+  components_json: string;
+  lines_json: string;
+  clipping_json: string;
+  has_snapshot: boolean;
+  created_at: string;
+}
+
+export interface IssueDetails {
+  issue: IssueRow;
+  elements: string[];
+  comments: CommentRow[];
+  viewpoints: ViewpointRow[];
+}
+
+export interface StatusRow {
+  element_global_id: string;
+  stage: string;
+  set_by: string;
+  set_at: string;
+  note: string | null;
+}
+
+export interface BcfImportSummary {
+  topics_added: number;
+  topics_skipped: number;
+  comments_added: number;
+  viewpoints_added: number;
+}
+
+export function issuesList(): Promise<IssueRow[]> {
+  if (!isTauri()) return Promise.resolve([]);
+  return invoke<IssueRow[]>('issues_list');
+}
+
+export function issueDetails(id: string): Promise<IssueDetails | null> {
+  return invoke<IssueDetails | null>('issue_details', { id });
+}
+
+export function issueCreate(
+  issue: NewIssue,
+  elements: string[],
+  viewpoint: NewViewpointInput | null,
+): Promise<IssueRow> {
+  return invoke<IssueRow>('issue_create', { issue, elements, viewpoint });
+}
+
+export function issueUpdate(
+  id: string,
+  patch: IssuePatch,
+  author: string,
+): Promise<IssueRow | null> {
+  return invoke<IssueRow | null>('issue_update', { id, patch, author });
+}
+
+export function issueSetElements(id: string, elements: string[]): Promise<void> {
+  return invoke<void>('issue_set_elements', { id, elements });
+}
+
+export function issueDelete(id: string): Promise<boolean> {
+  return invoke<boolean>('issue_delete', { id });
+}
+
+export function commentAdd(
+  issueId: string,
+  text: string,
+  author: string,
+  viewpointId: string | null,
+): Promise<CommentRow[]> {
+  return invoke<CommentRow[]>('comment_add', { issueId, text, author, viewpointId });
+}
+
+export function viewpointAdd(issueId: string, viewpoint: NewViewpointInput): Promise<ViewpointRow> {
+  return invoke<ViewpointRow>('viewpoint_add', { issueId, viewpoint });
+}
+
+export function viewpointSnapshot(id: string): Promise<string | null> {
+  return invoke<string | null>('viewpoint_snapshot', { id });
+}
+
+export function viewpointDelete(id: string): Promise<boolean> {
+  return invoke<boolean>('viewpoint_delete', { id });
+}
+
+export function statusList(): Promise<StatusRow[]> {
+  if (!isTauri()) return Promise.resolve([]);
+  return invoke<StatusRow[]>('status_list');
+}
+
+export function statusSet(
+  globalIds: string[],
+  stage: string,
+  author: string,
+  note: string | null,
+): Promise<number> {
+  return invoke<number>('status_set', { globalIds, stage, author, note });
+}
+
+export function statusClear(globalIds: string[]): Promise<number> {
+  return invoke<number>('status_clear', { globalIds });
+}
+
+export function bcfExport(path: string): Promise<number> {
+  return invoke<number>('bcf_export', { path });
+}
+
+export function bcfImport(path: string): Promise<BcfImportSummary> {
+  return invoke<BcfImportSummary>('bcf_import', { path });
+}

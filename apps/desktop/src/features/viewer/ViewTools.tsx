@@ -9,6 +9,7 @@ const colorModes: { value: ColorBy; label: string }[] = [
   { value: 'type', label: 'Type' },
   { value: 'material', label: 'Material' },
   { value: 'storey', label: 'Storey' },
+  { value: 'status', label: 'Status' },
 ];
 
 const axes: { value: SectionAxis; label: string; hint: string }[] = [

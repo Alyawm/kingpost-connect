@@ -3,13 +3,9 @@ import { ExplorerPanel } from '../features/explorer/ExplorerPanel';
 import { ViewerPanel } from '../features/viewer/ViewerPanel';
 import { LabPanel } from '../features/lab/LabPanel';
 import { PlannedPanel } from '../features/planned/PlannedPanel';
+import { ReviewPanel } from '../features/review/ReviewPanel';
 
 const planned: Partial<Record<Section, { phase: string; summary: string }>> = {
-  review: {
-    phase: 'Phase 2',
-    summary:
-      'BCF issues with viewpoints, a design-status pipeline for every element, and markups in 3D.',
-  },
   compare: {
     phase: 'Phase 3',
     summary:
@@ -33,6 +29,8 @@ export function SidePanel() {
       return <ExplorerPanel />;
     case 'viewer':
       return <ViewerPanel />;
+    case 'review':
+      return <ReviewPanel />;
     case 'lab':
       return <LabPanel />;
     default: {

@@ -10,6 +10,7 @@ use kp_project::Project;
 
 pub mod model;
 pub mod project;
+pub mod review;
 pub mod views;
 pub mod watcher;
 

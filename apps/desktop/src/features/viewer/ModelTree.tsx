@@ -8,8 +8,9 @@ import { buildTree, label, typeLabel } from './tree';
 export function ModelTree({ filter }: { filter: string }) {
   const elements = useModel((s) => s.elements);
   const hidden = useModel((s) => s.hidden);
-  const selectedId = useModel((s) => s.selectedId);
+  const selectedIds = useModel((s) => s.selectedIds);
   const select = useModel((s) => s.select);
+  const toggleSelect = useModel((s) => s.toggleSelect);
   const hide = useModel((s) => s.hide);
   const isolate = useModel((s) => s.isolate);
   const showAll = useModel((s) => s.showAll);
@@ -89,11 +90,15 @@ export function ModelTree({ filter }: { filter: string }) {
                                 type="button"
                                 className={cn(
                                   'flex w-full items-center gap-1 py-0.5 pr-2 text-left hover:bg-surface-2',
-                                  selectedId === element.express_id && 'bg-surface-3 text-fg',
+                                  selectedIds.has(element.express_id) && 'bg-surface-3 text-fg',
                                   hidden.has(element.express_id) && 'text-fg-muted/60 line-through',
                                 )}
                                 style={{ paddingLeft: 2 * 14 + 22 }}
-                                onClick={() => void select(element.express_id)}
+                                onClick={(event) =>
+                                  void (event.ctrlKey || event.metaKey
+                                    ? toggleSelect(element.express_id)
+                                    : select(element.express_id))
+                                }
                                 onDoubleClick={() => fitTo([element.express_id])}
                                 title={`${element.ifc_type} · ${element.global_id}`}
                               >

@@ -3,7 +3,7 @@
 
 mod commands;
 
-use commands::{model, project, views};
+use commands::{model, project, review, views};
 
 pub fn run() {
     tauri::Builder::default()
@@ -27,6 +27,21 @@ pub fn run() {
             views::view_save,
             views::view_rename,
             views::view_delete,
+            review::issues_list,
+            review::issue_details,
+            review::issue_create,
+            review::issue_update,
+            review::issue_set_elements,
+            review::issue_delete,
+            review::comment_add,
+            review::viewpoint_add,
+            review::viewpoint_snapshot,
+            review::viewpoint_delete,
+            review::status_list,
+            review::status_set,
+            review::status_clear,
+            review::bcf_export,
+            review::bcf_import,
         ])
         .run(tauri::generate_context!())
         .expect("failed to start KingPost Connect");
