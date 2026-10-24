@@ -1,0 +1,20 @@
+[package]
+name = "kp-licence"
+version.workspace = true
+edition.workspace = true
+license-file.workspace = true
+publish.workspace = true
+description = "Offline-tolerant licence keys: issue with a private key, verify with the embedded public key"
+
+[dependencies]
+serde.workspace = true
+serde_json.workspace = true
+thiserror.workspace = true
+base64.workspace = true
+ed25519-dalek = { version = "2", features = ["rand_core"] }
+rand_core = { version = "0.6", features = ["getrandom"] }
+time = { workspace = true, features = ["parsing", "macros", "formatting"] }
+
+[[example]]
+name = "licence-tool"
+path = "examples/licence_tool.rs"
