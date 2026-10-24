@@ -3,6 +3,14 @@
 All notable changes to KingPost Connect. The format follows Keep a Changelog; versions
 follow semantic versioning. Milestone tags match the headings below.
 
+## [1.1.1] — 2026-10-24 — Release build fix
+
+### Fixed
+- The Windows installer job failed on 1.0.1 and 1.1.0 at the bundling step. Updater
+  artifacts are now enabled through a committed overlay configuration file passed only
+  when the signing secret exists, instead of a quoted JSON argument, and the main
+  configuration no longer requests them.
+
 ## [1.1.0] — 2026-10-24 — Quantities and schedules
 
 The optional phase, taken on: schedules over the loaded model with totals and exports.
