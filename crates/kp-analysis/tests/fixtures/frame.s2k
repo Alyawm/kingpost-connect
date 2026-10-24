@@ -1,0 +1,62 @@
+File C:\models\frame.s2k was saved on 2026-10-24
+
+TABLE:  "PROGRAM CONTROL"
+   ProgramName=SAP2000   Version=24.1.0   ProgLevel=Ultimate   LicenseNum=0   CurrUnits="KN, m, C"   SteelCode="Eurocode 3-2005"   ConcCode="Eurocode 2-2004"
+
+TABLE:  "JOINT COORDINATES"
+   Joint=1   CoordSys=GLOBAL   CoordType=Cartesian   XorR=0   Y=0   Z=0   SpecialJt=No   GlobalX=0   GlobalY=0   GlobalZ=0
+   Joint=2   CoordSys=GLOBAL   CoordType=Cartesian   XorR=0   Y=0   Z=4   SpecialJt=No   GlobalX=0   GlobalY=0   GlobalZ=4
+   Joint=3   CoordSys=GLOBAL   CoordType=Cartesian   XorR=6   Y=0   Z=4   SpecialJt=No   GlobalX=6   GlobalY=0   GlobalZ=4
+   Joint=4   CoordSys=GLOBAL   CoordType=Cartesian   XorR=6   Y=0   Z=0   SpecialJt=No   GlobalX=6   GlobalY=0   GlobalZ=0
+
+TABLE:  "CONNECTIVITY - FRAME"
+   Frame=1   JointI=1   JointJ=2   IsCurved=No   Length=4   CentroidX=0   CentroidY=0   CentroidZ=2   GUID=a1
+   Frame=2   JointI=2   JointJ=3   IsCurved=No   Length=6   CentroidX=3   CentroidY=0   CentroidZ=4   GUID=a2
+   Frame=3   JointI=4   JointJ=3   IsCurved=No   Length=4   CentroidX=6   CentroidY=0   CentroidZ=2   GUID=a3
+
+TABLE:  "MATERIAL PROPERTIES 01 - GENERAL"
+   Material=S355   Type=Steel   SymType=Isotropic   TempDepend=No   Color=Red
+   Material=C30/37   Type=Concrete   SymType=Isotropic   TempDepend=No   Color=Gray
+
+TABLE:  "MATERIAL PROPERTIES 02 - BASIC MECHANICAL PROPERTIES"
+   Material=S355   UnitWeight=76.9729   UnitMass=7.849   E1=210000000   G12=80769231   U12=0.3   A1=1.17E-05
+   Material=C30/37   UnitWeight=24.9926   UnitMass=2.5486   E1=33000000   G12=13750000   U12=0.2   A1=1E-05
+
+TABLE:  "FRAME SECTION PROPERTIES 01 - GENERAL"
+   SectionName="UC 203x203x46"   Material=S355   Shape="I/Wide Flange"   t3=0.2032   t2=0.2036   tf=0.011   tw=0.0072   t2b=0.2036   tfb=0.011   Area=0.00587
+   SectionName="UB 406x178x54"   Material=S355   Shape="I/Wide Flange"   t3=0.4026   t2=0.1777   tf=0.0109   tw=0.0077   t2b=0.1777   tfb=0.0109   Area=0.0069
+
+TABLE:  "FRAME SECTION ASSIGNMENTS"
+   Frame=1   SectionType="I/Wide Flange"   AutoSelect=N.A.   AnalSect="UC 203x203x46"   DesignSect="UC 203x203x46"   MatProp=Default
+   Frame=2   SectionType="I/Wide Flange"   AutoSelect=N.A.   AnalSect="UB 406x178x54"   DesignSect="UB 406x178x54"   MatProp=Default
+   Frame=3   SectionType="I/Wide Flange"   AutoSelect=N.A.   AnalSect="UC 203x203x46"   DesignSect="UC 203x203x46"   MatProp=Default
+
+TABLE:  "JOINT RESTRAINT ASSIGNMENTS"
+   Joint=1   U1=Yes   U2=Yes   U3=Yes   R1=Yes   R2=Yes   R3=Yes
+   Joint=4   U1=Yes   U2=Yes   U3=Yes   R1=No   R2=No   R3=No
+
+TABLE:  "LOAD PATTERN DEFINITIONS"
+   LoadPat=DEAD   DesignType=Dead   SelfWtMult=1
+   LoadPat=LIVE   DesignType=Live   SelfWtMult=0
+
+TABLE:  "LOAD CASE DEFINITIONS"
+   Case=DEAD   Type=LinStatic   InitialCond=Zero   DesTypeOpt="Prog Det"   DesignType=Dead
+   Case=LIVE   Type=LinStatic   InitialCond=Zero   DesTypeOpt="Prog Det"   DesignType=Live
+   Case=MODAL   Type=LinModal   InitialCond=Zero   DesTypeOpt="Prog Det"   DesignType=Other
+
+TABLE:  "COMBINATION DEFINITIONS"
+   ComboName=ULS   ComboType="Linear Add"   AutoDesign=No   CaseType="Linear Static"   CaseName=DEAD   ScaleFactor=1.35
+   ComboName=ULS   CaseType="Linear Static"   CaseName=LIVE   ScaleFactor=1.5
+
+TABLE:  "JOINT LOADS - FORCE"
+   Joint=2   LoadPat=LIVE   CoordSys=GLOBAL   F1=10   F2=0   F3=0   M1=0   M2=0   M3=0
+
+TABLE:  "FRAME LOADS - DISTRIBUTED"
+   Frame=2   LoadPat=DEAD   CoordSys=GLOBAL   Type=Force   Dir=Gravity   DistType=RelDist   RelDistA=0   RelDistB=1   AbsDistA=0   AbsDistB=6   FOverLA=8   FOverLB=8
+
+TABLE:  "ELEMENT FORCES - FRAMES"
+   Frame=2   Station=0   OutputCase=DEAD   CaseType=LinStatic   P=-1.2   V2=24   V3=0   T=0   M2=0   M3=0   FrameElem=2-1   ElemStation=0
+   Frame=2   Station=3   OutputCase=DEAD   CaseType=LinStatic   P=-1.2   V2=0   V3=0   T=0   M2=0   M3=36   FrameElem=2-1   ElemStation=3
+   Frame=2   Station=6   OutputCase=DEAD   CaseType=LinStatic   P=-1.2   V2=-24   V3=0   T=0   M2=0   M3=0   FrameElem=2-1   ElemStation=6
+
+END TABLE DATA

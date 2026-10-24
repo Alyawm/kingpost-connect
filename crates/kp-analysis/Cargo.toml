@@ -1,0 +1,17 @@
+[package]
+name = "kp-analysis"
+version.workspace = true
+edition.workspace = true
+license-file.workspace = true
+publish.workspace = true
+description = "Structural analysis models: SAF, ETABS and SAP2000 readers, the IFC structural view, and matching against the physical model"
+
+[dependencies]
+serde.workspace = true
+serde_json.workspace = true
+thiserror.workspace = true
+calamine = "0.37"
+kp-ifc = { path = "../kp-ifc" }
+
+[dev-dependencies]
+rust_xlsxwriter = "0.79"
