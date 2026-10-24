@@ -19,6 +19,13 @@ Keep the version in step before tagging: `package.json`, `apps/desktop/package.j
 and `Cargo.lock` (run `cargo update -w --offline`). The CHANGELOG heading for the version
 is the release note.
 
+## Plugin versions
+
+The Tauri CLI refuses to build when an npm plugin package and its Rust crate are on
+different minor versions. `apps/desktop/src-tauri/Cargo.toml` pins the plugin crates to a
+minor version and `apps/desktop/package.json` the matching npm packages; bump both
+together. `pnpm tauri build` reports a mismatch within seconds, before any compiling.
+
 ## Keys kept outside the repository
 
 Two key pairs exist. Their private halves live on the maintainer's machine under

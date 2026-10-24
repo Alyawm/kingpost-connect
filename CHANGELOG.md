@@ -3,6 +3,14 @@
 All notable changes to KingPost Connect. The format follows Keep a Changelog; versions
 follow semantic versioning. Milestone tags match the headings below.
 
+## [1.1.2] — 2026-10-24 — Release build fix
+
+### Fixed
+- The Windows installer job stopped before building since 1.0.0 because the npm packages
+  of the updater and process plugins were a minor version behind their Rust crates, which
+  the Tauri CLI refuses. Both sides are now on the same minor versions and the crates are
+  pinned to them. (1.1.1 guessed at the cause and did not help.)
+
 ## [1.1.1] — 2026-10-24 — Release build fix
 
 ### Fixed
