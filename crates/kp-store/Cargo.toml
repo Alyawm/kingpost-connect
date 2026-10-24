@@ -8,6 +8,7 @@ description = "SQLite storage for KingPost Connect projects: schema, migrations 
 
 [dependencies]
 rusqlite.workspace = true
+serde.workspace = true
 thiserror.workspace = true
 
 [dev-dependencies]

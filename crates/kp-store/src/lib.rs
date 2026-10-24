@@ -10,7 +10,10 @@ use std::path::Path;
 
 use rusqlite::{Connection, OpenFlags, OptionalExtension, params};
 
+mod content;
 mod migrations;
+
+pub use content::{ElementRow, ElementSummary, FileRow, PropertyOut, PropertyRow, RevisionRow};
 
 #[derive(Debug, thiserror::Error)]
 pub enum StoreError {
