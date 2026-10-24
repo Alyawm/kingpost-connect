@@ -165,7 +165,7 @@ Durations assume **2 developers** (one Rust/backend‑leaning, one React/3D‑le
 
 ### Phase 3 — Revision comparison (weeks 16–19) → push `v0.3.0`
 
-> Status 2026‑10‑24: tagged `v0.3.0`. Done: GlobalId diff of two revisions with
+> Status 2026‑10‑24: tagged `v0.3.0` (installers built from `v0.3.1`, a CI‑only fix). Done: GlobalId diff of two revisions with
 > field‑level changes and numeric tolerance, stored per pair; Compare section with
 > filters, per‑type table, colour‑by‑change overlay, CSV export and issues from changes.
 > Open: 200 MB timing on a real file, geometry (bounding‑box) changes once geometry

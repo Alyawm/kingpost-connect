@@ -3,6 +3,13 @@
 All notable changes to KingPost Connect. The format follows Keep a Changelog; versions
 follow semantic versioning. Milestone tags match the headings below.
 
+## [0.3.1] — 2026-10-24 — Release build fix
+
+### Fixed
+- The release workflow's check job failed on Linux for every milestone tag because one
+  desktop test assumed Windows drive-letter paths; the test is now platform-independent.
+  This is the first tag expected to produce installers.
+
 ## [0.3.0] — 2026-10-24 — Revision comparison
 
 Compare two revisions of a model and act on the differences.

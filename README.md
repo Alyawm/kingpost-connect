@@ -12,7 +12,7 @@ Local-first: a project is a folder on disk; all data stays in it.
 
 ## Status
 
-**Revision comparison (v0.3.0).** Projects, IFC import with revisions, a viewer with
+**Revision comparison (v0.3.1).** Projects, IFC import with revisions, a viewer with
 element picking and multi-select, model tree, property inspector, section planes and plan
 views, colour by property or design status, measuring, markups, saved views; the review
 workflow: BCF-native issues with viewpoints, snapshots and comments, an element
