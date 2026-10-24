@@ -162,6 +162,68 @@ export class IfcModel {
     return out.subarray(0, offset);
   }
 
+  /**
+   * Quantities measured from an element's mesh in world space: volume by the divergence
+   * theorem (exact for closed meshes, approximate otherwise), surface area, bounding box
+   * and its longest dimension as the length. Null when the element has no triangles.
+   */
+  quantitiesOf(expressId: number): {
+    volume: number;
+    surfaceArea: number;
+    length: number;
+    bboxMin: [number, number, number];
+    bboxMax: [number, number, number];
+  } | null {
+    const tris = this.trianglesOf(expressId);
+    if (tris.length < 9) return null;
+    let volume = 0;
+    let area = 0;
+    const min = [Infinity, Infinity, Infinity];
+    const max = [-Infinity, -Infinity, -Infinity];
+    for (let i = 0; i < tris.length; i += 9) {
+      const ax = tris[i]!,
+        ay = tris[i + 1]!,
+        az = tris[i + 2]!;
+      const bx = tris[i + 3]!,
+        by = tris[i + 4]!,
+        bz = tris[i + 5]!;
+      const cx = tris[i + 6]!,
+        cy = tris[i + 7]!,
+        cz = tris[i + 8]!;
+      volume +=
+        (ax * (by * cz - bz * cy) - ay * (bx * cz - bz * cx) + az * (bx * cy - by * cx)) / 6;
+      const ux = bx - ax,
+        uy = by - ay,
+        uz = bz - az;
+      const vx = cx - ax,
+        vy = cy - ay,
+        vz = cz - az;
+      const nx = uy * vz - uz * vy,
+        ny = uz * vx - ux * vz,
+        nz = ux * vy - uy * vx;
+      area += Math.sqrt(nx * nx + ny * ny + nz * nz) / 2;
+      for (const [x, y, z] of [
+        [ax, ay, az],
+        [bx, by, bz],
+        [cx, cy, cz],
+      ] as const) {
+        if (x < min[0]!) min[0] = x;
+        if (y < min[1]!) min[1] = y;
+        if (z < min[2]!) min[2] = z;
+        if (x > max[0]!) max[0] = x;
+        if (y > max[1]!) max[1] = y;
+        if (z > max[2]!) max[2] = z;
+      }
+    }
+    return {
+      volume: Math.abs(volume),
+      surfaceArea: area,
+      length: Math.max(max[0]! - min[0]!, max[1]! - min[1]!, max[2]! - min[2]!),
+      bboxMin: [min[0]!, min[1]!, min[2]!],
+      bboxMax: [max[0]!, max[1]!, max[2]!],
+    };
+  }
+
   /** World-space bounds of the given elements, or null when none has geometry. */
   boundsOf(ids: Iterable<number>): THREE.Box3 | null {
     this.group.updateMatrixWorld(true);
