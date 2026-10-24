@@ -57,7 +57,7 @@ pub struct Column {
     pub aggregate: Aggregate,
 }
 
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Default)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct Filter {
     /// Keep these IFC types only; empty keeps all.
     #[serde(default)]
@@ -74,6 +74,17 @@ pub struct Filter {
 
 fn default_true() -> bool {
     true
+}
+
+impl Default for Filter {
+    fn default() -> Self {
+        Self {
+            ifc_types: Vec::new(),
+            storeys: Vec::new(),
+            text: String::new(),
+            physical_only: true,
+        }
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]

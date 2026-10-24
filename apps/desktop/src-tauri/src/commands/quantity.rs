@@ -81,7 +81,8 @@ pub fn schedule_export(
     path: String,
 ) -> Result<usize, String> {
     state.with_project(|project| {
-        let table = kp_quantity::evaluate(project.store(), revision_id, &definition).map_err(describe)?;
+        let table =
+            kp_quantity::evaluate(project.store(), revision_id, &definition).map_err(describe)?;
         let target = PathBuf::from(&path);
         let is_xlsx = target
             .extension()
@@ -97,13 +98,29 @@ pub fn schedule_export(
 }
 
 #[tauri::command]
-pub fn property_catalogue(state: State<'_, AppState>, revision_id: i64) -> Result<Vec<CatalogueEntry>, String> {
-    state.with_project(|project| project.store().property_catalogue(revision_id).map_err(describe))
+pub fn property_catalogue(
+    state: State<'_, AppState>,
+    revision_id: i64,
+) -> Result<Vec<CatalogueEntry>, String> {
+    state.with_project(|project| {
+        project
+            .store()
+            .property_catalogue(revision_id)
+            .map_err(describe)
+    })
 }
 
 #[tauri::command]
-pub fn geometry_quantity_count(state: State<'_, AppState>, revision_id: i64) -> Result<i64, String> {
-    state.with_project(|project| project.store().geometry_quantity_count(revision_id).map_err(describe))
+pub fn geometry_quantity_count(
+    state: State<'_, AppState>,
+    revision_id: i64,
+) -> Result<i64, String> {
+    state.with_project(|project| {
+        project
+            .store()
+            .geometry_quantity_count(revision_id)
+            .map_err(describe)
+    })
 }
 
 #[tauri::command]
@@ -134,17 +151,22 @@ pub fn density_set(
 ) -> Result<Vec<DensityRow>, String> {
     state.with_project(|project| {
         let material = material.trim();
-        if material.is_empty() || !(density > 0.0) {
+        if material.is_empty() || density.is_nan() || density <= 0.0 {
             return Err("a material name and a positive density are needed".to_owned());
         }
         let store = project.store();
-        store.set_density(material, density, note.as_deref()).map_err(describe)?;
+        store
+            .set_density(material, density, note.as_deref())
+            .map_err(describe)?;
         store.densities().map_err(describe)
     })
 }
 
 #[tauri::command]
-pub fn density_remove(state: State<'_, AppState>, material: String) -> Result<Vec<DensityRow>, String> {
+pub fn density_remove(
+    state: State<'_, AppState>,
+    material: String,
+) -> Result<Vec<DensityRow>, String> {
     state.with_project(|project| {
         let store = project.store();
         store.remove_density(&material).map_err(describe)?;

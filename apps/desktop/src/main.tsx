@@ -11,6 +11,7 @@ import { useUpdates } from './state/updates';
 import { useModel } from './state/model';
 import { useProject } from './state/project';
 import { useReview } from './state/review';
+import { useSchedules } from './state/schedules';
 import { useUi } from './state/ui';
 import { useView } from './state/view';
 import { useViewer } from './state/viewer';
@@ -33,6 +34,7 @@ if (import.meta.env.DEV) {
       useModel,
       useProject,
       useReview,
+      useSchedules,
       useUi,
       useView,
       useViewer,

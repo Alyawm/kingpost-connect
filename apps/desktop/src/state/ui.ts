@@ -3,10 +3,18 @@ import { persist } from 'zustand/middleware';
 
 export type Theme = 'dark' | 'light';
 export type Section =
-  'explorer' | 'viewer' | 'review' | 'compare' | 'analysis' | 'drawings' | 'coordination' | 'lab';
+  | 'explorer'
+  | 'viewer'
+  | 'review'
+  | 'compare'
+  | 'analysis'
+  | 'drawings'
+  | 'coordination'
+  | 'schedules'
+  | 'lab';
 export type PanelSide = 'left' | 'right' | 'bottom';
 /** What the workspace shows: the 3D model, or a drawing sheet over it. */
-export type Workspace = 'model' | 'sheet';
+export type Workspace = 'model' | 'sheet' | 'schedule';
 
 interface UiState {
   theme: Theme;

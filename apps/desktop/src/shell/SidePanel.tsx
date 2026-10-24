@@ -7,6 +7,7 @@ import { ComparePanel } from '../features/compare/ComparePanel';
 import { AnalysisPanel } from '../features/analysis/AnalysisPanel';
 import { DrawingsPanel } from '../features/drawings/DrawingsPanel';
 import { CoordinationPanel } from '../features/coordination/CoordinationPanel';
+import { SchedulesPanel } from '../features/schedules/SchedulesPanel';
 
 export function SidePanel() {
   const section = useUi((s) => s.section);
@@ -25,6 +26,8 @@ export function SidePanel() {
       return <DrawingsPanel />;
     case 'coordination':
       return <CoordinationPanel />;
+    case 'schedules':
+      return <SchedulesPanel />;
     case 'lab':
       return <LabPanel />;
   }

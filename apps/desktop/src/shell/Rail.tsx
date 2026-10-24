@@ -7,6 +7,7 @@ import {
   FolderOpen,
   GitCompareArrows,
   Boxes,
+  Table2,
   type LucideIcon,
 } from 'lucide-react';
 import { IconButton } from '@kingpost/ui';
@@ -21,6 +22,7 @@ const items: { section: Section; icon: LucideIcon }[] = [
   { section: 'analysis', icon: Activity },
   { section: 'drawings', icon: FileText },
   { section: 'coordination', icon: Boxes },
+  { section: 'schedules', icon: Table2 },
 ];
 
 export function Rail() {

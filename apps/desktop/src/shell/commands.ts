@@ -19,6 +19,7 @@ export const sectionTitles: Record<Section, string> = {
   analysis: 'Analysis',
   drawings: 'Drawings',
   coordination: 'Coordination',
+  schedules: 'Schedules',
   lab: 'Lab',
 };
 

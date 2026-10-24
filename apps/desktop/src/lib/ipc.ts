@@ -1154,7 +1154,10 @@ export function schedulePresets(): Promise<SchedulePresets> {
   return invoke<SchedulePresets>('schedule_presets');
 }
 
-export function scheduleSave(id: string | null, definition: ScheduleDefinition): Promise<PresetRow> {
+export function scheduleSave(
+  id: string | null,
+  definition: ScheduleDefinition,
+): Promise<PresetRow> {
   return invoke<PresetRow>('schedule_save', { id, definition });
 }
 
@@ -1162,11 +1165,18 @@ export function scheduleDelete(id: string): Promise<boolean> {
   return invoke<boolean>('schedule_delete', { id });
 }
 
-export function scheduleEvaluate(revisionId: number, definition: ScheduleDefinition): Promise<ScheduleTable> {
+export function scheduleEvaluate(
+  revisionId: number,
+  definition: ScheduleDefinition,
+): Promise<ScheduleTable> {
   return invoke<ScheduleTable>('schedule_evaluate', { revisionId, definition });
 }
 
-export function scheduleExport(revisionId: number, definition: ScheduleDefinition, path: string): Promise<number> {
+export function scheduleExport(
+  revisionId: number,
+  definition: ScheduleDefinition,
+  path: string,
+): Promise<number> {
   return invoke<number>('schedule_export', { revisionId, definition, path });
 }
 
@@ -1178,7 +1188,10 @@ export function geometryQuantityCount(revisionId: number): Promise<number> {
   return invoke<number>('geometry_quantity_count', { revisionId });
 }
 
-export function geometryQuantitiesSave(revisionId: number, rows: GeometryQuantity[]): Promise<number> {
+export function geometryQuantitiesSave(
+  revisionId: number,
+  rows: GeometryQuantity[],
+): Promise<number> {
   return invoke<number>('geometry_quantities_save', { revisionId, rows });
 }
 
@@ -1187,7 +1200,11 @@ export function densities(): Promise<DensityRow[]> {
   return invoke<DensityRow[]>('densities');
 }
 
-export function densitySet(material: string, density: number, note: string | null): Promise<DensityRow[]> {
+export function densitySet(
+  material: string,
+  density: number,
+  note: string | null,
+): Promise<DensityRow[]> {
   return invoke<DensityRow[]>('density_set', { material, density, note });
 }
 

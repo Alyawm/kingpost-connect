@@ -15,6 +15,7 @@ import { useDrawings } from '../state/drawings';
 import { useUi } from '../state/ui';
 import { SheetView } from '../features/drawings/SheetView';
 import { SheetCompare } from '../features/drawings/SheetCompare';
+import { ScheduleView } from '../features/schedules/ScheduleView';
 
 /**
  * The 3D viewport. Mounted once for the life of the window so the WebGL context and
@@ -55,14 +56,18 @@ export function Workspace() {
   const sheetOpen = useDrawings((s) => s.open !== null);
   const comparing = useDrawings((s) => s.compare !== null);
   const showSheet = workspace === 'sheet' && (sheetOpen || comparing);
+  const showSchedule = workspace === 'schedule';
 
   // The viewport stays mounted under a sheet so the loaded model survives the switch.
   return (
     <>
-      <div className={showSheet ? 'invisible absolute inset-0' : 'absolute inset-0'}>
+      <div
+        className={showSheet || showSchedule ? 'invisible absolute inset-0' : 'absolute inset-0'}
+      >
         <Viewport onReady={onReady} onSelect={onSelect} onPickPoint={onPickPoint} />
       </div>
       {showSheet && (comparing ? <SheetCompare /> : <SheetView />)}
+      {showSchedule && <ScheduleView />}
     </>
   );
 }
