@@ -11,6 +11,7 @@ use std::path::Path;
 use rusqlite::{Connection, OpenFlags, OptionalExtension, params};
 
 mod analysis;
+mod clash;
 mod content;
 mod diff;
 mod drawings;
@@ -19,6 +20,7 @@ mod review;
 mod views;
 
 pub use analysis::{AnalysisModelRow, AnalysisModelSummary, LinkSetRow};
+pub use clash::{CLASH_STATUSES, ClashFound, ClashRow, ClashTestRow, RunSummary};
 pub use content::{ElementRow, ElementSummary, FileRow, PropertyOut, PropertyRow, RevisionRow};
 pub use diff::{DiffItemRow, DiffResultRow, PropertyFact};
 pub use drawings::{
@@ -238,6 +240,8 @@ mod tests {
             "sheet",
             "sheet_link",
             "sheet_markup",
+            "clash_test",
+            "clash",
         ] {
             assert!(
                 tables.iter().any(|t| t == expected),
