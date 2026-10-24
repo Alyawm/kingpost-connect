@@ -26,7 +26,10 @@ or attached to releases. Expected set for the Phase 1 spike:
 - one steel-framed building (IFC4 preferred)
 - one reinforced-concrete building with reinforcement
 - one mixed or large model (200 MB+) for the performance budget
-- one analysis export (SAF `.xlsx` or ETABS `.e2k`) matching one of the above
+- one analysis export (SAF `.xlsx` or ETABS `.e2k`) matching one of the above. Until a real
+  export arrives, `IFC_Sample.e2k` is an ETABS text model generated from the IFC's own
+  member axes (with some members dropped and some sections changed on purpose) so the
+  physical ↔ analytical matching can be exercised; it is not an engineering model.
 - one PDF drawing set matching one of the above
 
 ## Measurements

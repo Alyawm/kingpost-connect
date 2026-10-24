@@ -177,6 +177,14 @@ Durations assume **2 developers** (one Rust/backend‑leaning, one React/3D‑le
 - **Done when:** diff of two 200 MB revisions completes < 30 s and lists every changed member.
 
 ### Phase 4 — Analysis model viewing (weeks 20–27) → push `v0.4.0`
+
+> Status 2026‑10‑24: tagged `v0.4.0`. Done: ETABS / SAP2000 / SAF readers and the IFC
+> structural view into one model; wireframe overlay with supports, loads and surfaces;
+> member detail with force diagrams; physical ↔ analytical matching by name and axis
+> with section/material comparison, mismatch report, colour‑by‑link and manual links.
+> Open: N/V/M diagrams drawn in 3D along members, utilisation colour map (needs design
+> results), ETABS/SAP result tables (CSV/XLSX exports), curved members. See
+> `docs/devlog/2026-10-phase4-analysis.md` and ADR 006.
 - **SAF** (Structural Analysis Format, xlsx) importer: nodes, members, surfaces, supports, loads, load cases/combos, results if present.
 - **IFC structural analysis view**: `IfcStructuralCurveMember`, `IfcStructuralSurfaceMember`, `IfcStructuralPointConnection`, `IfcStructuralLoad*`, `IfcStructuralResultGroup`.
 - Text parsers for **ETABS `.e2k`** and **SAP2000 `.s2k`** (geometry, sections, materials, loads; results via exported tables CSV/XLSX).

@@ -28,6 +28,7 @@ Add a row when introducing a new dependency.
 | notify | CC0-1.0 / Artistic-2.0 | Project folder watcher |
 | quick-xml | MIT | BCF XML reading and writing |
 | zip | MIT | BCF archives |
+| calamine | MIT | Reading SAF workbooks (.xlsx) |
 
 ## Development only
 
@@ -38,5 +39,6 @@ Add a row when introducing a new dependency.
 | ESLint, typescript-eslint | MIT |
 | Prettier | MIT |
 | Testing Library | MIT |
+| rust_xlsxwriter | MIT / Apache-2.0 |
 | jsdom | MIT |
 | tempfile (Rust) | MIT / Apache-2.0 |

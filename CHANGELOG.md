@@ -3,6 +3,31 @@
 All notable changes to KingPost Connect. The format follows Keep a Changelog; versions
 follow semantic versioning. Milestone tags match the headings below.
 
+## [0.4.0] — 2026-10-24 — Analysis model viewing
+
+Structural analysis models next to the physical model, with the two linked.
+
+### Added
+- `kp-analysis` crate: one `AnalysisModel` (nodes, members, surfaces, supports,
+  materials, sections, load cases, combinations, point/line/surface loads, member forces)
+  read from ETABS `.e2k`, SAP2000 `.s2k`, SAF workbooks and the structural view of an IFC
+  file (`IfcStructuralCurveMember`, `IfcStructuralSurfaceMember`, point connections with
+  boundary conditions, load cases and actions, placed through the placement chain).
+- Matching of physical elements to analysis members: by name, then by nearest axis within
+  a tolerance, one to one; section and material comparison by the sizes in their names
+  and dimensions; report with unmatched elements and members; manual link and unlink.
+- Store: analysis models as one document per revision (migration 004 replaces the unused
+  placeholder tables from 001) and link reports per revision pair.
+- Analysis section: import analysis files, show a model as a wireframe overlay (members
+  coloured by kind, nodes, support glyphs, load arrows, translucent surfaces) with
+  visibility toggles and a physical-model toggle; member search and detail with loads,
+  per-case force extremes and a force diagram along the member; load cases, combinations
+  and materials; tolerance and offset settings; match, counters that open the mismatch
+  lists, "colour by link" on the physical model, link/unlink by hand.
+- An IFC import that carries a structural analysis view stores it as an analysis model of
+  the same revision.
+- Viewer: analysis layer with member picking (lines win over the solids around them).
+
 ## [0.3.1] — 2026-10-24 — Release build fix
 
 ### Fixed
