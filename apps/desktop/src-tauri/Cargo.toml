@@ -32,4 +32,5 @@ kp-bcf = { path = "../../../crates/kp-bcf" }
 kp-diff = { path = "../../../crates/kp-diff" }
 kp-analysis = { path = "../../../crates/kp-analysis" }
 kp-licence = { path = "../../../crates/kp-licence" }
+kp-quantity = { path = "../../../crates/kp-quantity" }
 sha2.workspace = true

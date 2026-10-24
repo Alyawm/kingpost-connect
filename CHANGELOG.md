@@ -3,6 +3,13 @@
 All notable changes to KingPost Connect. The format follows Keep a Changelog; versions
 follow semantic versioning. Milestone tags match the headings below.
 
+## [1.0.1] — 2026-10-24 — Release build fix
+
+### Fixed
+- The release workflow failed when the updater signing secret was not set, because the
+  build insists on signing updater artifacts once a public key is configured. Without the
+  secret the installers are now built without updater artifacts; with it, both are built.
+
 ## [1.0.0] — 2026-10-24 — First release
 
 The application is ready to install, update and support.

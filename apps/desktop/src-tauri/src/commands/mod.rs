@@ -17,6 +17,7 @@ pub mod drawings;
 pub mod licence;
 pub mod model;
 pub mod project;
+pub mod quantity;
 pub mod review;
 pub mod views;
 pub mod watcher;

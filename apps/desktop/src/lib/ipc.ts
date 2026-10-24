@@ -1055,3 +1055,142 @@ export function geometryCacheWrite(sha256: string, data: Uint8Array): Promise<nu
 export function geometryCacheClear(): Promise<number> {
   return invoke<number>('geometry_cache_clear');
 }
+
+// ---- Quantities and schedules ----
+
+export type ColumnKey =
+  | { kind: 'field'; field: string }
+  | { kind: 'property'; pset: string; name: string }
+  | { kind: 'derived'; quantity: 'length' | 'volume' | 'area' | 'mass' | 'count' | string };
+
+export type Aggregate = 'none' | 'sum' | 'count' | 'avg' | 'min' | 'max';
+
+export interface ScheduleColumn {
+  key: ColumnKey;
+  label: string;
+  aggregate: Aggregate;
+}
+
+export interface ScheduleFilter {
+  ifc_types: string[];
+  storeys: string[];
+  text: string;
+  physical_only: boolean;
+}
+
+export interface ScheduleDefinition {
+  name: string;
+  columns: ScheduleColumn[];
+  group_by: ColumnKey[];
+  filter: ScheduleFilter;
+  sort_by: number | null;
+  sort_desc: boolean;
+}
+
+export interface ScheduleCell {
+  text: string;
+  num: number | null;
+}
+
+export type ScheduleRowKind = 'group' | 'element' | 'subtotal' | 'total';
+
+export interface ScheduleRow {
+  kind: ScheduleRowKind;
+  depth: number;
+  label: string;
+  express_id: number | null;
+  global_id: string | null;
+  cells: ScheduleCell[];
+  count: number;
+}
+
+export interface ScheduleTable {
+  definition: ScheduleDefinition;
+  columns: string[];
+  rows: ScheduleRow[];
+  element_count: number;
+  missing_densities: string[];
+}
+
+export interface PresetRow {
+  id: string;
+  scope: string;
+  kind: string;
+  name: string;
+  definition_json: string;
+  created_at: string;
+}
+
+export interface SchedulePresets {
+  builtin: ScheduleDefinition[];
+  saved: PresetRow[];
+}
+
+export interface CatalogueEntry {
+  pset: string;
+  name: string;
+  kind: string;
+  unit: string | null;
+  count: number;
+}
+
+export interface GeometryQuantity {
+  express_id: number;
+  volume: number | null;
+  surface_area: number | null;
+  length: number | null;
+  bbox_min: Triple;
+  bbox_max: Triple;
+}
+
+export interface DensityRow {
+  material: string;
+  density: number;
+  note: string | null;
+}
+
+export function schedulePresets(): Promise<SchedulePresets> {
+  if (!isTauri()) return Promise.resolve({ builtin: [], saved: [] });
+  return invoke<SchedulePresets>('schedule_presets');
+}
+
+export function scheduleSave(id: string | null, definition: ScheduleDefinition): Promise<PresetRow> {
+  return invoke<PresetRow>('schedule_save', { id, definition });
+}
+
+export function scheduleDelete(id: string): Promise<boolean> {
+  return invoke<boolean>('schedule_delete', { id });
+}
+
+export function scheduleEvaluate(revisionId: number, definition: ScheduleDefinition): Promise<ScheduleTable> {
+  return invoke<ScheduleTable>('schedule_evaluate', { revisionId, definition });
+}
+
+export function scheduleExport(revisionId: number, definition: ScheduleDefinition, path: string): Promise<number> {
+  return invoke<number>('schedule_export', { revisionId, definition, path });
+}
+
+export function propertyCatalogue(revisionId: number): Promise<CatalogueEntry[]> {
+  return invoke<CatalogueEntry[]>('property_catalogue', { revisionId });
+}
+
+export function geometryQuantityCount(revisionId: number): Promise<number> {
+  return invoke<number>('geometry_quantity_count', { revisionId });
+}
+
+export function geometryQuantitiesSave(revisionId: number, rows: GeometryQuantity[]): Promise<number> {
+  return invoke<number>('geometry_quantities_save', { revisionId, rows });
+}
+
+export function densities(): Promise<DensityRow[]> {
+  if (!isTauri()) return Promise.resolve([]);
+  return invoke<DensityRow[]>('densities');
+}
+
+export function densitySet(material: string, density: number, note: string | null): Promise<DensityRow[]> {
+  return invoke<DensityRow[]>('density_set', { material, density, note });
+}
+
+export function densityRemove(material: string): Promise<DensityRow[]> {
+  return invoke<DensityRow[]>('density_remove', { material });
+}

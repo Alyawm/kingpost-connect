@@ -16,6 +16,7 @@ mod content;
 mod diff;
 mod drawings;
 mod migrations;
+mod quantity;
 mod review;
 mod views;
 
@@ -26,6 +27,7 @@ pub use diff::{DiffItemRow, DiffResultRow, PropertyFact};
 pub use drawings::{
     ElementSheetLink, NewSheet, NewSheetLink, SheetHit, SheetLinkRow, SheetMarkupRow, SheetRow,
 };
+pub use quantity::{CatalogueEntry, DensityRow, GeometryQuantity, PresetRow};
 pub use review::{
     CommentRow, IssuePatch, IssueRow, NewIssue, NewViewpoint, STAGES, StatusRow, ViewpointRow,
 };
@@ -242,6 +244,7 @@ mod tests {
             "sheet_markup",
             "clash_test",
             "clash",
+            "material_density",
         ] {
             assert!(
                 tables.iter().any(|t| t == expected),

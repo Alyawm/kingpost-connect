@@ -1,7 +1,7 @@
 //! Ordered schema migrations. Append only: never edit a migration that has shipped,
 //! add a new numbered file and bump `LATEST`.
 
-pub const LATEST: i64 = 6;
+pub const LATEST: i64 = 7;
 
 pub const ALL: &[(i64, &str)] = &[
     (1, include_str!("../migrations/001_initial.sql")),
@@ -10,4 +10,5 @@ pub const ALL: &[(i64, &str)] = &[
     (4, include_str!("../migrations/004_analysis.sql")),
     (5, include_str!("../migrations/005_drawings.sql")),
     (6, include_str!("../migrations/006_clash.sql")),
+    (7, include_str!("../migrations/007_quantities.sql")),
 ];

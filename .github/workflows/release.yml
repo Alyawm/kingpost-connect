@@ -70,6 +70,9 @@ jobs:
           TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
         with:
           projectPath: apps/desktop
+          # Updater artifacts need the signing key; without the secret the installers are
+          # still built, just without latest.json and signatures.
+          args: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY == '' && '--config {"bundle":{"createUpdaterArtifacts":false}}' || '' }}
           tagName: ${{ github.ref_name }}
           releaseName: 'KingPost Connect ${{ github.ref_name }}'
           releaseBody: 'See CHANGELOG.md for the changes in this milestone.'

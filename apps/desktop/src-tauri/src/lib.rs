@@ -4,7 +4,8 @@
 mod commands;
 
 use commands::{
-    analysis, cache, clash, compare, diagnostics, drawings, licence, model, project, review, views,
+    analysis, cache, clash, compare, diagnostics, drawings, licence, model, project, quantity,
+    review, views,
 };
 
 pub fn run() {
@@ -81,6 +82,17 @@ pub fn run() {
             cache::geometry_cache_read,
             cache::geometry_cache_write,
             cache::geometry_cache_clear,
+            quantity::schedule_presets,
+            quantity::schedule_save,
+            quantity::schedule_delete,
+            quantity::schedule_evaluate,
+            quantity::schedule_export,
+            quantity::property_catalogue,
+            quantity::geometry_quantity_count,
+            quantity::geometry_quantities_save,
+            quantity::densities,
+            quantity::density_set,
+            quantity::density_remove,
         ])
         .run(tauri::generate_context!())
         .expect("failed to start KingPost Connect");
