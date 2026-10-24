@@ -13,6 +13,7 @@ use rusqlite::{Connection, OpenFlags, OptionalExtension, params};
 mod analysis;
 mod content;
 mod diff;
+mod drawings;
 mod migrations;
 mod review;
 mod views;
@@ -20,6 +21,9 @@ mod views;
 pub use analysis::{AnalysisModelRow, AnalysisModelSummary, LinkSetRow};
 pub use content::{ElementRow, ElementSummary, FileRow, PropertyOut, PropertyRow, RevisionRow};
 pub use diff::{DiffItemRow, DiffResultRow, PropertyFact};
+pub use drawings::{
+    ElementSheetLink, NewSheet, NewSheetLink, SheetHit, SheetLinkRow, SheetMarkupRow, SheetRow,
+};
 pub use review::{
     CommentRow, IssuePatch, IssueRow, NewIssue, NewViewpoint, STAGES, StatusRow, ViewpointRow,
 };
@@ -233,7 +237,7 @@ mod tests {
             "analysis_link_set",
             "sheet",
             "sheet_link",
-            "markup",
+            "sheet_markup",
         ] {
             assert!(
                 tables.iter().any(|t| t == expected),
