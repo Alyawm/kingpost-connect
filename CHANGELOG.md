@@ -3,6 +3,28 @@
 All notable changes to KingPost Connect. The format follows Keep a Changelog; versions
 follow semantic versioning. Milestone tags match the headings below.
 
+## [0.1.0-alpha] — 2026-10-24 — Internal alpha
+
+First state a structural engineer can use: open a project folder, import IFC models,
+look at them, find things, cut plans, measure and keep views.
+
+### Added
+- IFC reader in Rust (`kp-ifc`): elements, storeys, types, materials, units, property
+  sets and quantities from IFC2X3/IFC4/IFC4X3 files; a bench example for timings.
+- Import into the project database as revisions; Explorer lists files in the project
+  folder with their revisions and refreshes on its own when files change.
+- Viewer: per-element picking inside merged geometry, selection highlight, hide/isolate/
+  show, model tree by storey and type with filter, properties inspector with property and
+  quantity sets, section planes with a one-click plan view per storey, colour by type/
+  material/storey with legend, point-to-point measure with Δx/Δy/Δz, standard views.
+- Saved views with thumbnails (camera, hidden elements, colouring, section).
+- Developer aids: `KINGPOST_PROJECT` pre-opens a project; `window.kingpost` exposes the
+  stores in development builds.
+
+### Fixed
+- IFC geometry was rotated onto its side; web-ifc already delivers Y-up coordinates.
+- Elements contained in spaces now report the space's storey.
+
 ## [0.0.1] — 2026-10-24 — Foundation
 
 First buildable state of the repository; nothing here is a product feature yet.

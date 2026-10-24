@@ -70,6 +70,24 @@ The repository exists so that the next developer can understand how the program 
   milestone push the history is tidied into coherent, buildable commits per feature.
   Pushing a `v*` tag runs CI and builds the installers into a draft release.
 
+## Checking the real desktop window from a script
+
+The interface runs inside WebView2, which supports Chromium's remote debugging. This is how
+features are exercised against the real shell without clicking by hand:
+
+```powershell
+$env:KINGPOST_PROJECT = 'C:\path\to\a\project\folder'      # pre-opens that folder as a project
+$env:WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS = '--remote-debugging-port=9222 --remote-allow-origins=*'
+pnpm tauri dev
+```
+
+Then `http://localhost:9222/json` lists the page and its `webSocketDebuggerUrl`; any
+Chrome DevTools Protocol client can call `Runtime.evaluate` and `Page.captureScreenshot`
+against it. Development builds expose the state stores as `window.kingpost`
+(`useProject`, `useModel`, `useView`, `useViews`, `useViewer`, `useUi`), so a check can
+load a revision, pick elements, set a section or save a view and then read the result.
+Keep the debugging flags out of release builds and ordinary launches.
+
 ## Code conventions
 
 - TypeScript: strict, `noUncheckedIndexedAccess` on, type-only imports inline. Components

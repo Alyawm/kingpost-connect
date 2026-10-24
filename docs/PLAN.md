@@ -136,6 +136,12 @@ Durations assume **2 developers** (one Rust/backend‑leaning, one React/3D‑le
 - **Done when:** `pnpm tauri dev` opens the shell; CI builds an installer; corpus loads in a plain three.js test page.
 
 ### Phase 1 — Project + IFC viewer (weeks 3–10) → **internal alpha**, push `v0.1.0-alpha`
+
+> Status 2026‑10‑24: tagged `v0.1.0-alpha`. Done: project folders, file browser with
+> watcher, import with revisions, viewer with element identity, tree, inspector, sections
+> and plan views, colour by property, measure, standard and saved views. Carried into the
+> next session: geometry cache for warm opens, box/multi‑select, transparency, drag‑drop
+> import, and the 200 MB+ measurement. See `docs/devlog/2026-10-phase1-alpha.md`.
 - Project = a folder. Create/open, file browser with kinds, drag‑drop import, file watcher.
 - IFC import pipeline: parse → fragments cache → properties → SQLite. Progress UI, cancel, re‑import on change (new revision).
 - Viewer: orbit/pan/zoom/fit, selection (click, box, Ctrl‑multi), isolate/hide/show, transparency, section planes (storey & free), measure (distance/angle/area), colour by property, storey navigator.

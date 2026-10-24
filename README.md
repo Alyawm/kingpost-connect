@@ -12,11 +12,11 @@ Local-first: a project is a folder on disk; all data stays in it.
 
 ## Status
 
-**Foundation (v0.0.1).** The application shell runs, projects can be created and opened,
-the 3D viewport works, and an IFC load bench is in place for the Phase 1 performance spike.
-No product feature from the list above is implemented yet. See [CHANGELOG.md](CHANGELOG.md),
-the [foundation devlog](docs/devlog/2026-10-foundation.md) and the roadmap in
-[docs/PLAN.md](docs/PLAN.md).
+**Internal alpha (v0.1.0-alpha).** Projects, IFC import with revisions, a viewer with
+element picking, model tree, property inspector, section planes and plan views, colour by
+property, measuring and saved views. Review, comparison, analysis overlay and drawings
+are the next phases. See [CHANGELOG.md](CHANGELOG.md), the devlogs in
+[docs/devlog/](docs/devlog/) and the roadmap in [docs/PLAN.md](docs/PLAN.md).
 
 ## Getting started
 

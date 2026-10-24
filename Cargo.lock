@@ -1723,7 +1723,7 @@ dependencies = [
 
 [[package]]
 name = "kingpost-connect"
-version = "0.0.1"
+version = "0.1.0"
 dependencies = [
  "base64 0.22.1",
  "kp-ifc",
@@ -1740,7 +1740,7 @@ dependencies = [
 
 [[package]]
 name = "kp-ifc"
-version = "0.0.1"
+version = "0.1.0"
 dependencies = [
  "kp-store",
  "serde",
@@ -1752,7 +1752,7 @@ dependencies = [
 
 [[package]]
 name = "kp-project"
-version = "0.0.1"
+version = "0.1.0"
 dependencies = [
  "kp-store",
  "serde",
@@ -1765,7 +1765,7 @@ dependencies = [
 
 [[package]]
 name = "kp-store"
-version = "0.0.1"
+version = "0.1.0"
 dependencies = [
  "rusqlite",
  "serde",
