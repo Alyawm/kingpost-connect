@@ -1,0 +1,77 @@
+/*
+ * Design tokens for KingPost Connect.
+ *
+ * Raw values live on `--kp-*` custom properties so they can be read from JavaScript
+ * (the 3D viewport samples `--kp-canvas` for its background). The `@theme inline` block
+ * maps them onto Tailwind utilities (`bg-surface`, `text-fg-muted`, `border-edge`, ...).
+ *
+ * Dark is the default because the application is used for long sessions against 3D
+ * content; light is selected with `data-theme="light"` on <html>.
+ */
+
+:root,
+[data-theme='dark'] {
+  color-scheme: dark;
+
+  --kp-canvas: #0e1116;
+  --kp-surface: #151920;
+  --kp-surface-2: #1b2129;
+  --kp-surface-3: #232a34;
+  --kp-edge: #2b333e;
+
+  --kp-fg: #e7eaef;
+  --kp-fg-muted: #98a2b0;
+
+  --kp-accent: #5b9dff;
+  --kp-accent-hover: #7bb0ff;
+  --kp-accent-fg: #0b1220;
+
+  --kp-selection: #ffb020;
+  --kp-danger: #ff6b6b;
+  --kp-success: #3ccf7a;
+  --kp-warning: #f5b941;
+}
+
+[data-theme='light'] {
+  color-scheme: light;
+
+  --kp-canvas: #e9ecf0;
+  --kp-surface: #ffffff;
+  --kp-surface-2: #f3f4f6;
+  --kp-surface-3: #e6e9ed;
+  --kp-edge: #d3d8df;
+
+  --kp-fg: #1b1f26;
+  --kp-fg-muted: #5f6975;
+
+  --kp-accent: #2f6fe4;
+  --kp-accent-hover: #255dc4;
+  --kp-accent-fg: #ffffff;
+
+  --kp-selection: #f59e0b;
+  --kp-danger: #d64545;
+  --kp-success: #1f9d5a;
+  --kp-warning: #d08700;
+}
+
+@theme inline {
+  --color-canvas: var(--kp-canvas);
+  --color-surface: var(--kp-surface);
+  --color-surface-2: var(--kp-surface-2);
+  --color-surface-3: var(--kp-surface-3);
+  --color-edge: var(--kp-edge);
+  --color-fg: var(--kp-fg);
+  --color-fg-muted: var(--kp-fg-muted);
+  --color-accent: var(--kp-accent);
+  --color-accent-hover: var(--kp-accent-hover);
+  --color-accent-fg: var(--kp-accent-fg);
+  --color-selection: var(--kp-selection);
+  --color-danger: var(--kp-danger);
+  --color-success: var(--kp-success);
+  --color-warning: var(--kp-warning);
+
+  --font-sans: 'Segoe UI Variable', 'Segoe UI', Inter, system-ui, -apple-system, sans-serif;
+  --font-mono: 'Cascadia Code', 'JetBrains Mono', ui-monospace, Consolas, monospace;
+}
+
+@custom-variant dark (&:where([data-theme='dark'], [data-theme='dark'] *));
