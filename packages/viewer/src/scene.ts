@@ -26,6 +26,12 @@ export interface PointPick {
   expressId?: number;
 }
 
+/** Camera position and orbit target, in world coordinates. */
+export interface CameraState {
+  position: [number, number, number];
+  target: [number, number, number];
+}
+
 /** The part of the scene controller that application code is allowed to drive. */
 export interface ViewportHandle {
   add(object: THREE.Object3D): void;
@@ -35,6 +41,10 @@ export interface ViewportHandle {
   addOverlay(object: THREE.Object3D): void;
   clearOverlay(): void;
   setPickMode(mode: PickMode): void;
+  getCamera(): CameraState;
+  setCamera(state: CameraState): void;
+  /** Renders a frame and returns it as a JPEG data URL no wider than `maxWidth`. */
+  snapshot(maxWidth?: number): string;
   fit(): void;
   fitTo(box: THREE.Box3, direction?: ViewDirection): void;
   viewFrom(direction: ViewDirection): void;
@@ -171,6 +181,35 @@ export class SceneController implements ViewportHandle {
   setPickMode(mode: PickMode): void {
     this.pickMode = mode;
     this.canvas.style.cursor = mode === 'point' ? 'crosshair' : '';
+  }
+
+  getCamera(): CameraState {
+    return {
+      position: this.camera.position.toArray() as [number, number, number],
+      target: this.controls.target.toArray() as [number, number, number],
+    };
+  }
+
+  setCamera(state: CameraState): void {
+    this.camera.position.fromArray(state.position);
+    this.controls.target.fromArray(state.target);
+    const distance = Math.max(this.camera.position.distanceTo(this.controls.target), 1);
+    this.camera.near = Math.max(distance / 1000, 0.01);
+    this.camera.far = Math.max(distance * 50, 1000);
+    this.camera.updateProjectionMatrix();
+    this.controls.update();
+    this.requestRender();
+  }
+
+  snapshot(maxWidth = 320): string {
+    // Draw straight after rendering: the WebGL buffer stays readable until this task ends.
+    this.renderer.render(this.scene, this.camera);
+    const scale = Math.min(1, maxWidth / Math.max(this.canvas.width, 1));
+    const target = document.createElement('canvas');
+    target.width = Math.max(1, Math.round(this.canvas.width * scale));
+    target.height = Math.max(1, Math.round(this.canvas.height * scale));
+    target.getContext('2d')?.drawImage(this.canvas, 0, 0, target.width, target.height);
+    return target.toDataURL('image/jpeg', 0.75);
   }
 
   clear(): void {

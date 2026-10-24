@@ -1,6 +1,7 @@
 export { Viewport, type ViewportProps } from './Viewport';
 export {
   SceneController,
+  type CameraState,
   type PickMode,
   type PickResult,
   type PointPick,
