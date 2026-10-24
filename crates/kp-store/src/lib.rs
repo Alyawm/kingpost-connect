@@ -12,9 +12,13 @@ use rusqlite::{Connection, OpenFlags, OptionalExtension, params};
 
 mod content;
 mod migrations;
+mod review;
 mod views;
 
 pub use content::{ElementRow, ElementSummary, FileRow, PropertyOut, PropertyRow, RevisionRow};
+pub use review::{
+    CommentRow, IssuePatch, IssueRow, NewIssue, NewViewpoint, STAGES, StatusRow, ViewpointRow,
+};
 pub use views::SavedViewRow;
 
 #[derive(Debug, thiserror::Error)]
