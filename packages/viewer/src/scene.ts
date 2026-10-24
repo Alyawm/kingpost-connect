@@ -11,9 +11,18 @@ export interface PickResult {
 /** The part of the scene controller that application code is allowed to drive. */
 export interface ViewportHandle {
   add(object: THREE.Object3D): void;
+  remove(object: THREE.Object3D): void;
   clear(): void;
   fit(): void;
+  fitTo(box: THREE.Box3): void;
   select(object: THREE.Mesh | null): void;
+  render(): void;
+}
+
+/** Meshes may resolve their own picks (e.g. an element inside a merged IFC mesh). */
+interface PickableUserData {
+  resolvePick?: (faceIndex: number) => PickResult | null;
+  managedSelection?: boolean;
 }
 
 const SELECTION_COLOR = new THREE.Color(0xffb020);
@@ -95,6 +104,16 @@ export class SceneController implements ViewportHandle {
     this.requestRender();
   }
 
+  /** Removes an object without disposing it; the caller keeps ownership. */
+  remove(object: THREE.Object3D): void {
+    this.content.remove(object);
+    this.requestRender();
+  }
+
+  render(): void {
+    this.requestRender();
+  }
+
   clear(): void {
     this.select(null);
     for (const child of [...this.content.children]) {
@@ -110,12 +129,19 @@ export class SceneController implements ViewportHandle {
     if (box.isEmpty()) {
       box.set(new THREE.Vector3(-8, 0, -8), new THREE.Vector3(8, 6, 8));
     }
+    this.fitTo(box);
+  }
+
+  /** Frames a world-space box, keeping the current viewing direction. */
+  fitTo(box: THREE.Box3): void {
     const center = box.getCenter(new THREE.Vector3());
     const size = box.getSize(new THREE.Vector3());
     const radius = Math.max(size.x, size.y, size.z, 1) * 0.5;
     const distance = (radius / Math.tan(THREE.MathUtils.degToRad(this.camera.fov) / 2)) * 1.25;
 
-    const direction = new THREE.Vector3(1, 0.8, 1.2).normalize();
+    const direction = this.camera.position.clone().sub(this.controls.target);
+    if (direction.lengthSq() < 1e-6) direction.set(1, 0.8, 1.2);
+    direction.normalize();
     this.camera.position.copy(center).addScaledVector(direction, distance);
     this.camera.near = Math.max(distance / 1000, 0.01);
     this.camera.far = distance * 50;
@@ -199,11 +225,23 @@ export class SceneController implements ViewportHandle {
     this.raycaster.setFromCamera(pointer, this.camera);
     const hit = this.raycaster
       .intersectObjects(this.content.children, true)
-      .find((h) => (h.object as THREE.Mesh).isMesh);
-    const mesh = hit ? (hit.object as THREE.Mesh) : null;
+      .find((h) => (h.object as THREE.Mesh).isMesh && h.object.visible);
+    if (!hit) {
+      this.select(null);
+      this.onPick?.(null);
+      return;
+    }
 
+    const mesh = hit.object as THREE.Mesh;
+    const pickable = mesh.userData as PickableUserData;
+    if (pickable.resolvePick) {
+      // The mesh paints its own selection; only report what was hit.
+      this.select(null);
+      this.onPick?.(pickable.resolvePick(hit.faceIndex ?? 0));
+      return;
+    }
     this.select(mesh);
-    this.onPick?.(mesh ? pickResultOf(mesh) : null);
+    this.onPick?.(pickResultOf(mesh));
   };
 }
 

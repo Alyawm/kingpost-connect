@@ -2,6 +2,7 @@ import * as THREE from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import type { IfcAPI } from 'web-ifc';
 import { colorKey, toBufferGeometry } from './geometry';
+import { IfcModel, solidVertexColors, type ElementRange, type MeshBucket } from './model';
 import { IFC_WASM_DIR } from './wasm';
 
 export interface IfcLoadStats {
@@ -18,7 +19,7 @@ export interface IfcLoadStats {
 }
 
 export interface IfcLoadResult {
-  group: THREE.Group;
+  model: IfcModel;
   stats: IfcLoadStats;
 }
 
@@ -42,10 +43,15 @@ function runtime(): Promise<{ api: IfcAPI; initMs: number }> {
   return apiPromise;
 }
 
+interface Bucket {
+  color: THREE.Color;
+  opacity: number;
+  parts: { geometry: THREE.BufferGeometry; expressId: number }[];
+}
+
 /**
- * Parses an IFC file and returns its geometry as one three.js group, merged into a
- * single mesh per colour. This is the plain, unoptimised path used to measure how far
- * web-ifc gets on real structural models before the fragment cache is designed.
+ * Parses an IFC file's geometry and returns it as an [`IfcModel`]: one mesh per colour,
+ * with the element ranges needed for picking, hiding and tinting.
  *
  * The returned group is Y-up (IFC is Z-up; the rotation is applied on the group).
  */
@@ -56,14 +62,10 @@ export async function loadIfcToGroup(data: Uint8Array): Promise<IfcLoadResult> {
   const parseStart = performance.now();
   const modelID = api.OpenModel(data, { COORDINATE_TO_ORIGIN: true });
   const parseMs = Math.round(performance.now() - parseStart);
-
   const schema = api.GetModelSchema(modelID) ?? 'unknown';
 
   const geometryStart = performance.now();
-  const byMaterial = new Map<
-    string,
-    { color: THREE.Color; opacity: number; parts: THREE.BufferGeometry[] }
-  >();
+  const byMaterial = new Map<string, Bucket>();
   let meshes = 0;
   let triangles = 0;
 
@@ -98,7 +100,7 @@ export async function loadIfcToGroup(data: Uint8Array): Promise<IfcLoadResult> {
           };
           byMaterial.set(key, bucket);
         }
-        bucket.parts.push(geometry);
+        bucket.parts.push({ geometry, expressId: flatMesh.expressID });
       }
     });
   } finally {
@@ -109,26 +111,58 @@ export async function loadIfcToGroup(data: Uint8Array): Promise<IfcLoadResult> {
   group.name = 'IFC model';
   group.rotation.x = -Math.PI / 2;
 
+  const buckets: MeshBucket[] = [];
   for (const [key, bucket] of byMaterial) {
-    const merged = mergeGeometries(bucket.parts, false);
-    for (const part of bucket.parts) part.dispose();
+    // Parts of one element are kept adjacent so each element is a single range.
+    bucket.parts.sort((a, b) => a.expressId - b.expressId);
+    const ranges: ElementRange[] = [];
+    let indexCursor = 0;
+    let vertexCursor = 0;
+    for (const part of bucket.parts) {
+      const indexCount = part.geometry.getIndex()?.count ?? 0;
+      const vertexCount = part.geometry.getAttribute('position').count;
+      const last = ranges[ranges.length - 1];
+      if (last && last.expressId === part.expressId) {
+        last.indexCount += indexCount;
+        last.vertexCount += vertexCount;
+      } else {
+        ranges.push({
+          expressId: part.expressId,
+          indexStart: indexCursor,
+          indexCount,
+          vertexStart: vertexCursor,
+          vertexCount,
+        });
+      }
+      indexCursor += indexCount;
+      vertexCursor += vertexCount;
+    }
+
+    const merged = mergeGeometries(
+      bucket.parts.map((p) => p.geometry),
+      false,
+    );
+    for (const part of bucket.parts) part.geometry.dispose();
     if (!merged) continue;
+    merged.setAttribute('color', solidVertexColors(vertexCursor, bucket.color));
+
     const material = new THREE.MeshLambertMaterial({
-      color: bucket.color,
+      color: 0xffffff,
+      vertexColors: true,
       transparent: bucket.opacity < 1,
       opacity: bucket.opacity,
       side: THREE.DoubleSide,
     });
     const mesh = new THREE.Mesh(merged, material);
     mesh.name = `material ${key}`;
-    mesh.userData = { name: `Merged geometry (${bucket.parts.length} parts)`, type: 'IfcProduct' };
     group.add(mesh);
+    buckets.push({ mesh, baseColor: bucket.color, ranges });
   }
 
   const geometryMs = Math.round(performance.now() - geometryStart);
 
   return {
-    group,
+    model: new IfcModel(group, buckets),
     stats: {
       schema,
       meshes,
