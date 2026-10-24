@@ -3,6 +3,24 @@
 All notable changes to KingPost Connect. The format follows Keep a Changelog; versions
 follow semantic versioning. Milestone tags match the headings below.
 
+## [0.3.0] — 2026-10-24 — Revision comparison
+
+Compare two revisions of a model and act on the differences.
+
+### Added
+- `kp-diff` crate: compares two revisions by GlobalId into added, removed and modified
+  elements, with the exact identity fields and `pset/property` values that changed;
+  numeric tolerance; summary by IFC type; CSV writer; results stored per revision pair.
+- `kp-store::diff`: property facts per revision and the `diff_result` / `diff_item`
+  read, write and lookup.
+- Compare section: file and revision pickers (last two revisions preselected), counters
+  that filter, per-type table, text filter, expandable field changes per element,
+  select-in-3D, "load rev N", recompute, CSV export through the save dialog.
+- "Colour by change": the loaded revision tinted green / amber / red / grey from the
+  current comparison, in the viewer legend like the other colour modes.
+- "issue" on any changed element creates a review issue with the element linked, the
+  current view as viewpoint and a `revision change` label.
+
 ## [0.2.0-beta] — 2026-10-24 — Private beta: review workflow
 
 Issues, viewpoints and a design-status pipeline on top of the viewer, exchanged as BCF.

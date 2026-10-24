@@ -1743,10 +1743,11 @@ dependencies = [
 
 [[package]]
 name = "kingpost-connect"
-version = "0.2.0"
+version = "0.3.0"
 dependencies = [
  "base64 0.22.1",
  "kp-bcf",
+ "kp-diff",
  "kp-ifc",
  "kp-project",
  "kp-store",
@@ -1761,7 +1762,7 @@ dependencies = [
 
 [[package]]
 name = "kp-bcf"
-version = "0.2.0"
+version = "0.3.0"
 dependencies = [
  "quick-xml 0.37.5",
  "tempfile",
@@ -1770,8 +1771,18 @@ dependencies = [
 ]
 
 [[package]]
+name = "kp-diff"
+version = "0.3.0"
+dependencies = [
+ "kp-store",
+ "serde",
+ "serde_json",
+ "thiserror 2.0.21",
+]
+
+[[package]]
 name = "kp-ifc"
-version = "0.2.0"
+version = "0.3.0"
 dependencies = [
  "kp-store",
  "serde",
@@ -1783,7 +1794,7 @@ dependencies = [
 
 [[package]]
 name = "kp-project"
-version = "0.2.0"
+version = "0.3.0"
 dependencies = [
  "kp-store",
  "serde",
@@ -1796,7 +1807,7 @@ dependencies = [
 
 [[package]]
 name = "kp-store"
-version = "0.2.0"
+version = "0.3.0"
 dependencies = [
  "rusqlite",
  "serde",

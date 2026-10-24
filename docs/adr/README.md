@@ -13,6 +13,7 @@ Read them in order to understand why the code looks the way it does.
 | [002](002-project-storage.md) | A project is a folder with a `.kingpost/` directory | Accepted |
 | [003](003-ifc-property-pipeline.md) | Where IFC properties are parsed: Rust reader for semantics, web-ifc for geometry | Accepted |
 | [004](004-review-data-and-bcf.md) | Review data in BCF terms; viewer coordinates converted at the edge | Accepted |
+| [005](005-revision-comparison.md) | Revisions compared by GlobalId on stored semantics, not geometry | Accepted |
 
 ## Template
 

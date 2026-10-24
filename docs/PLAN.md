@@ -164,6 +164,13 @@ Durations assume **2 developers** (one Rust/backend‑leaning, one React/3D‑le
 - **Done when:** a BCF exported from KingPost Connect opens correctly in BIMcollab/Solibri and round‑trips.
 
 ### Phase 3 — Revision comparison (weeks 16–19) → push `v0.3.0`
+
+> Status 2026‑10‑24: tagged `v0.3.0`. Done: GlobalId diff of two revisions with
+> field‑level changes and numeric tolerance, stored per pair; Compare section with
+> filters, per‑type table, colour‑by‑change overlay, CSV export and issues from changes.
+> Open: 200 MB timing on a real file, geometry (bounding‑box) changes once geometry
+> caching exists, fallback matching when GlobalIds are regenerated, side‑by‑side
+> viewports. See `docs/devlog/2026-10-phase3-compare.md` and ADR 005.
 - Import a new version of the same IFC → new revision. Diff by `GlobalId`: added / removed / modified (which psets/props changed, geometry bbox/volume changed beyond tolerance, moved).
 - Side‑by‑side and overlay modes; colour coding; diff table with export; "create issue from change".
 - Section/profile change detection for members (e.g. UB 406×178×54 → 406×178×60) and rebar deltas where present.
