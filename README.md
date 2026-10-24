@@ -12,10 +12,12 @@ Local-first: a project is a folder on disk; all data stays in it.
 
 ## Status
 
-**Internal alpha (v0.1.0-alpha).** Projects, IFC import with revisions, a viewer with
-element picking, model tree, property inspector, section planes and plan views, colour by
-property, measuring and saved views. Review, comparison, analysis overlay and drawings
-are the next phases. See [CHANGELOG.md](CHANGELOG.md), the devlogs in
+**Private beta (v0.2.0-beta).** Projects, IFC import with revisions, a viewer with element
+picking and multi-select, model tree, property inspector, section planes and plan views,
+colour by property or design status, measuring, markups, saved views — and the review
+workflow: BCF-native issues with viewpoints, snapshots and comments, an element
+design-status pipeline, a dashboard, and BCF export/import. Comparison, analysis overlay
+and drawings are the next phases. See [CHANGELOG.md](CHANGELOG.md), the devlogs in
 [docs/devlog/](docs/devlog/) and the roadmap in [docs/PLAN.md](docs/PLAN.md).
 
 ## Getting started

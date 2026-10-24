@@ -3,6 +3,30 @@
 All notable changes to KingPost Connect. The format follows Keep a Changelog; versions
 follow semantic versioning. Milestone tags match the headings below.
 
+## [0.2.0-beta] — 2026-10-24 — Private beta: review workflow
+
+Issues, viewpoints and a design-status pipeline on top of the viewer, exchanged as BCF.
+
+### Added
+- Review section: dashboard (open, closed, overdue issues; design-status coverage across the
+  loaded model), issue list with filters and search, new-issue form that links the current
+  selection and attaches the current view as a viewpoint.
+- Issue detail: status, priority, assignee, due date, description, labels; linked elements
+  with "Select in 3D"; viewpoints with snapshots (apply on click, add current view);
+  comments with optional viewpoint.
+- Element design status (modelled → analysed → designed → checked → approved) set in bulk
+  from the selection, shown in the inspector, and available as "Colour by status".
+- Multi-selection: Ctrl+click in the viewport and the model tree.
+- Markup lines drawn on the model, saved into viewpoints and exported as BCF lines.
+- BCF 3.0 export of all issues and import of BCF 2.1/3.0 files (existing topics skipped by
+  guid); `kp-bcf` crate with round-trip tests.
+- Viewer ↔ IFC world coordinate frame (`IfcFrame`) built from web-ifc's coordination
+  matrix, so viewpoints are stored and exchanged in IFC coordinates.
+
+### Fixed
+- Viewpoint and saved-view snapshots were blank in WebView2; the renderer now keeps its
+  drawing buffer.
+
 ## [0.1.0-alpha] — 2026-10-24 — Internal alpha
 
 First state a structural engineer can use: open a project folder, import IFC models,

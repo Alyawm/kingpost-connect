@@ -26,6 +26,8 @@ Add a row when introducing a new dependency.
 | sha2 | MIT / Apache-2.0 | File digests for revisions |
 | base64 | MIT / Apache-2.0 | View thumbnails over IPC |
 | notify | CC0-1.0 / Artistic-2.0 | Project folder watcher |
+| quick-xml | MIT | BCF XML reading and writing |
+| zip | MIT | BCF archives |
 
 ## Development only
 

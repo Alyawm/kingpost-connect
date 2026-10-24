@@ -150,6 +150,13 @@ Durations assume **2 developers** (one Rust/backend‑leaning, one React/3D‑le
 - **Done when:** a 300 MB structural IFC opens in < 60 s cold / < 5 s warm, 60 fps orbit on a mid laptop; all corpus files load without crash.
 
 ### Phase 2 — Structural review workflow (weeks 11–15) → **private beta**, push `v0.2.0-beta`
+
+> Status 2026‑10‑24: tagged `v0.2.0-beta`. Done: BCF‑native issues with viewpoints,
+> snapshots, comments and linked elements; design‑status pipeline with bulk set and
+> colour‑by‑status; multi‑select; markup lines; dashboard; BCF 3.0 export and 2.1/3.0
+> import. Open: round‑trip check in BIMcollab/Solibri (no licence on this machine), 3D
+> clouds/text markups beyond lines, merging comments into existing topics on import.
+> See `docs/devlog/2026-10-phase2-beta.md`.
 - Issues = BCF 3.0 native (zip on disk, importable/exportable to other tools). Title, status, priority, assignee, due date, labels, comments, viewpoints with snapshot, linked elements.
 - Element **design status** pipeline: modelled → analysed → designed → checked → approved; bulk set from selection; colourise by status; status report.
 - Markups in 3D (clouds, arrows, text) stored with viewpoints.
