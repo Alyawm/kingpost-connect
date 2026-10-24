@@ -53,7 +53,7 @@ interface Bucket {
  * Parses an IFC file's geometry and returns it as an [`IfcModel`]: one mesh per colour,
  * with the element ranges needed for picking, hiding and tinting.
  *
- * The returned group is Y-up (IFC is Z-up; the rotation is applied on the group).
+ * The returned group is Y-up, as web-ifc delivers it.
  */
 export async function loadIfcToGroup(data: Uint8Array): Promise<IfcLoadResult> {
   const total = performance.now();
@@ -107,9 +107,9 @@ export async function loadIfcToGroup(data: Uint8Array): Promise<IfcLoadResult> {
     api.CloseModel(modelID);
   }
 
+  // web-ifc already converts IFC's Z-up coordinates to three.js Y-up; no rotation here.
   const group = new THREE.Group();
   group.name = 'IFC model';
-  group.rotation.x = -Math.PI / 2;
 
   const buckets: MeshBucket[] = [];
   for (const [key, bucket] of byMaterial) {
