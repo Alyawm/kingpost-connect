@@ -87,6 +87,19 @@ grouped by the pair's types; each clash selects both elements and marks the poin
 status (new, active, reviewed, approved, resolved) and a note; raise an issue on a clash.
 Re-running keeps statuses, resolves clashes that are gone and reopens ones that are back.
 
+## Schedules
+
+Pick a built-in schedule (steel members, concrete elements, reinforcement, foundations, all
+elements by type) or start a new one, and it runs on the loaded revision: columns can be
+element fields, any property of the revision, or derived quantities (count, length,
+volume, area, mass). Group by any column, choose sum, count, average, minimum or maximum
+per column, filter by type, storey or text, and sort by clicking a heading. Length, volume
+and area come from the model's base quantities when it has them and are measured from the
+geometry once otherwise; mass is volume times a density from the project's density table
+(editable in the panel; common steel, concrete, timber, aluminium and masonry names have
+defaults, and materials without one are listed). Click a row to select its elements in the
+model. Save a schedule as a preset for the project; export as XLSX or CSV with totals.
+
 ## Settings and help
 
 Settings (`Ctrl+,`): your name (recorded on everything you create), theme, update

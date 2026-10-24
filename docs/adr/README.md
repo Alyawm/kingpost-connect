@@ -18,6 +18,7 @@ Read them in order to understand why the code looks the way it does.
 | [007](007-drawings.md) | Sheets read and compared in the interface with pdf.js; links follow sheet numbers | Accepted |
 | [008](008-clash-detection.md) | Clashes found on the loaded meshes in the interface and tracked by element pair | Accepted |
 | [009](009-updates-licensing-diagnostics.md) | Updates only on request, licences checked offline, diagnostics stay local | Accepted |
+| [010](010-schedules.md) | Schedules are definitions evaluated in Rust; geometry quantities come from the viewer once | Accepted |
 
 ## Template
 

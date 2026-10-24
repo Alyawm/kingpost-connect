@@ -3,6 +3,31 @@
 All notable changes to KingPost Connect. The format follows Keep a Changelog; versions
 follow semantic versioning. Milestone tags match the headings below.
 
+## [1.1.0] — 2026-10-24 — Quantities and schedules
+
+The optional phase, taken on: schedules over the loaded model with totals and exports.
+
+### Added
+- `kp-quantity` crate: schedule definitions (element fields, properties, derived
+  quantities), evaluation with filter, multi-level grouping in natural order, sum/count/
+  average/min/max, sorting, totals; built-in presets (steel members, concrete elements,
+  reinforcement, foundations, all elements by type); CSV and XLSX export with totals.
+- Derived quantities: base quantities first, then length, volume and area measured from
+  the element meshes once per revision and stored; mass as volume × density from an
+  editable per-project density table with defaults by material name, and a list of the
+  materials that matched nothing.
+- Schedules section: presets and saved definitions, an editor for columns (fields,
+  derived quantities, any property from the revision's catalogue), grouping, aggregates
+  and filters (types, storeys, text), a virtualised grid in the workspace with
+  collapsible groups and selection in the model, export through the save dialog, and the
+  density table.
+- Store: migration 007 (density table, presets of any kind); geometry quantities per
+  element.
+
+### Fixed
+- 1.0.1 carried unformatted work in progress and failed its lint check, so it produced no
+  installers; this release does.
+
 ## [1.0.1] — 2026-10-24 — Release build fix
 
 ### Fixed

@@ -32,6 +32,8 @@ Add a row when introducing a new dependency.
 | pdf.js (`pdfjs-dist`) | Apache-2.0 | Rendering and reading PDF drawing sheets |
 | tauri-plugin-updater, tauri-plugin-process (`@tauri-apps/plugin-updater`, `@tauri-apps/plugin-process`) | MIT / Apache-2.0 | Updates on request and restart after install |
 | ed25519-dalek, rand_core | BSD-3-Clause / MIT / Apache-2.0 | Licence key signatures |
+| rust_xlsxwriter | MIT / Apache-2.0 | Schedule export to XLSX |
+| TanStack Virtual (`@tanstack/react-virtual`) | MIT | Virtualised schedule grid |
 
 ## Development only
 
@@ -42,6 +44,5 @@ Add a row when introducing a new dependency.
 | ESLint, typescript-eslint | MIT |
 | Prettier | MIT |
 | Testing Library | MIT |
-| rust_xlsxwriter | MIT / Apache-2.0 |
 | jsdom | MIT |
 | tempfile (Rust) | MIT / Apache-2.0 |

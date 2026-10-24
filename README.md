@@ -12,7 +12,7 @@ Local-first: a project is a folder on disk; all data stays in it.
 
 ## Status
 
-**First release (v1.0.0).** Projects, IFC import with revisions, a viewer with
+**Quantities and schedules (v1.1.0).** Projects, IFC import with revisions, a viewer with
 element picking and multi-select, model tree, property inspector, section planes and plan
 views, colour by property or design status, measuring, markups, saved views; the review
 workflow: BCF-native issues with viewpoints, snapshots and comments, an element
@@ -24,8 +24,9 @@ reported; and PDF drawing sets with a sheet index, search, markups, regions link
 elements and saved views, and pixel comparison of two issues; and clash tests between
 element sets with statuses that survive re-runs and issues raised from clashes. The
 application updates on request from signed releases, takes an offline licence key, keeps
-its logs local and caches geometry for fast re-opening. Quantities and schedules
-(Phase 8) remain optional, at the client's decision. See [CHANGELOG.md](CHANGELOG.md), the devlogs in
+its logs local and caches geometry for fast re-opening. Schedules tabulate any
+elements by any fields, properties or derived quantities with grouping, totals, mass from
+densities, and CSV or XLSX export. See [CHANGELOG.md](CHANGELOG.md), the devlogs in
 [docs/devlog/](docs/devlog/) and the roadmap in [docs/PLAN.md](docs/PLAN.md).
 
 ## Getting started

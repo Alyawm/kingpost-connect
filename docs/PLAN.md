@@ -228,6 +228,13 @@ Durations assume **2 developers** (one Rust/backend‑leaning, one React/3D‑le
 - Security: no network calls without consent; local data stays in the project folder.
 
 ### Phase 8 — Quantities & schedules (weeks 40–43, **optional — client decision**) → push `v1.1.0`
+
+> Status 2026‑10‑24: tagged `v1.1.0`. Done: schedule definitions evaluated in Rust with
+> grouping, aggregates and totals; built‑in structural presets; derived length/volume/area
+> from the meshes and mass from an editable density table; virtualised grid with select in
+> 3D; CSV/XLSX export. Steel tonnage on the fixture within 1 % of the catalogue mass. Open:
+> per‑model unit setting instead of the millimetre heuristic, formulas between columns.
+> See `docs/devlog/2026-10-phase8-schedules.md` and ADR 010.
 - Schedule grid over `element × property`: columns, multi‑level grouping, sum/count/avg, filter, sort, virtualised.
 - Structural presets: steel member schedule (section, grade, length, mass), concrete elements (volume by storey/type/grade), rebar (dia, shape, total length, mass), foundations.
 - Derived quantities when the model lacks them (length/volume from geometry; mass = volume × density from an editable material table).
