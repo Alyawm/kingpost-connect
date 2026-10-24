@@ -16,6 +16,12 @@ export { createSampleFrame } from './sample';
 export { loadIfcToGroup, type IfcLoadStats, type IfcLoadResult } from './ifc/load';
 export { IfcModel, type ElementRange, type MeshBucket } from './ifc/model';
 export {
+  deserializeBuckets,
+  modelFromCache,
+  serializeBuckets,
+  type CachedModel,
+} from './ifc/cache';
+export {
   findClashes,
   type ClashHit,
   type ClashOptions,

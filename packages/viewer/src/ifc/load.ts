@@ -24,6 +24,8 @@ export interface IfcLoadResult {
   stats: IfcLoadStats;
   /** Maps viewer space to IFC world coordinates (see `IfcFrame`). */
   frame: IfcFrame;
+  /** web-ifc's coordination matrix, kept for the geometry cache. */
+  coordination: number[] | null;
 }
 
 let apiPromise: Promise<{ api: IfcAPI; initMs: number }> | null = null;
@@ -168,6 +170,7 @@ export async function loadIfcToGroup(data: Uint8Array): Promise<IfcLoadResult> {
 
   return {
     model: new IfcModel(group, buckets),
+    coordination,
     frame: new IfcFrame(coordination),
     stats: {
       schema,

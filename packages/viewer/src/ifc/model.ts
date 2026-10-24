@@ -28,7 +28,7 @@ const SELECTION = new THREE.Color(0xffb020);
  */
 export class IfcModel {
   readonly group: THREE.Group;
-  private readonly buckets: MeshBucket[];
+  readonly buckets: MeshBucket[];
   private readonly partsOf = new Map<number, { bucket: MeshBucket; range: ElementRange }[]>();
   private readonly fullIndex = new Map<THREE.Mesh, Uint32Array>();
   private readonly hidden = new Set<number>();
