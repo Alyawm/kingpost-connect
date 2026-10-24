@@ -10,12 +10,14 @@ use std::path::Path;
 
 use rusqlite::{Connection, OpenFlags, OptionalExtension, params};
 
+mod analysis;
 mod content;
 mod diff;
 mod migrations;
 mod review;
 mod views;
 
+pub use analysis::{AnalysisModelRow, AnalysisModelSummary, LinkSetRow};
 pub use content::{ElementRow, ElementSummary, FileRow, PropertyOut, PropertyRow, RevisionRow};
 pub use diff::{DiffItemRow, DiffResultRow, PropertyFact};
 pub use review::{
@@ -228,8 +230,7 @@ mod tests {
             "diff_result",
             "diff_item",
             "analysis_model",
-            "analysis_member",
-            "analysis_result",
+            "analysis_link_set",
             "sheet",
             "sheet_link",
             "markup",
