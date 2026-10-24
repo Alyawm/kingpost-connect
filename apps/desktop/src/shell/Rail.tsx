@@ -6,6 +6,7 @@ import {
   FlaskConical,
   FolderOpen,
   GitCompareArrows,
+  Boxes,
   type LucideIcon,
 } from 'lucide-react';
 import { IconButton } from '@kingpost/ui';
@@ -19,6 +20,7 @@ const items: { section: Section; icon: LucideIcon }[] = [
   { section: 'compare', icon: GitCompareArrows },
   { section: 'analysis', icon: Activity },
   { section: 'drawings', icon: FileText },
+  { section: 'coordination', icon: Boxes },
 ];
 
 export function Rail() {

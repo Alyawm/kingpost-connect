@@ -17,6 +17,7 @@ export const sectionTitles: Record<Section, string> = {
   compare: 'Compare',
   analysis: 'Analysis',
   drawings: 'Drawings',
+  coordination: 'Coordination',
   lab: 'Lab',
 };
 

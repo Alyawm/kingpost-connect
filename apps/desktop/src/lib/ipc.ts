@@ -906,3 +906,93 @@ export function sheetMarkupAdd(
 export function sheetMarkupDelete(id: string): Promise<boolean> {
   return invoke<boolean>('sheet_markup_delete', { id });
 }
+
+// ---- Coordination: clash tests ----
+
+export type ClashKind = 'hard' | 'clearance';
+export type ClashStatus = 'new' | 'active' | 'reviewed' | 'approved' | 'resolved';
+export const CLASH_STATUSES: ClashStatus[] = ['new', 'active', 'reviewed', 'approved', 'resolved'];
+
+export interface ClashTestRow {
+  id: string;
+  name: string;
+  kind: ClashKind;
+  clearance: number;
+  set_a: string[];
+  set_b: string[];
+  created_at: string;
+  last_run_at: string | null;
+  last_revision_id: number | null;
+  open_count: number;
+  total_count: number;
+}
+
+export interface ClashFound {
+  a_global_id: string;
+  b_global_id: string;
+  kind: ClashKind;
+  distance: number;
+  point: Triple;
+}
+
+export interface ClashRow {
+  id: string;
+  test_id: string;
+  a_global_id: string;
+  b_global_id: string;
+  kind: ClashKind;
+  distance: number;
+  point: Triple;
+  status: ClashStatus;
+  note: string | null;
+  first_seen_at: string;
+  last_seen_at: string;
+  resolved_at: string | null;
+}
+
+export interface ClashRunSummary {
+  found: number;
+  new: number;
+  still: number;
+  reopened: number;
+  resolved: number;
+}
+
+export function clashTests(): Promise<ClashTestRow[]> {
+  if (!isTauri()) return Promise.resolve([]);
+  return invoke<ClashTestRow[]>('clash_tests');
+}
+
+export function clashTestCreate(
+  name: string,
+  kind: ClashKind,
+  clearance: number,
+  setA: string[],
+  setB: string[],
+): Promise<ClashTestRow> {
+  return invoke<ClashTestRow>('clash_test_create', { name, kind, clearance, setA, setB });
+}
+
+export function clashTestDelete(id: string): Promise<boolean> {
+  return invoke<boolean>('clash_test_delete', { id });
+}
+
+export function clashRunRecord(
+  testId: string,
+  revisionId: number | null,
+  found: ClashFound[],
+): Promise<ClashRunSummary> {
+  return invoke<ClashRunSummary>('clash_run_record', { testId, revisionId, found });
+}
+
+export function clashList(testId: string): Promise<ClashRow[]> {
+  return invoke<ClashRow[]>('clash_list', { testId });
+}
+
+export function clashSetStatus(
+  id: string,
+  status: ClashStatus,
+  note: string | null,
+): Promise<boolean> {
+  return invoke<boolean>('clash_set_status', { id, status, note });
+}

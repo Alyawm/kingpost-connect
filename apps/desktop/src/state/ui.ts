@@ -3,7 +3,7 @@ import { persist } from 'zustand/middleware';
 
 export type Theme = 'dark' | 'light';
 export type Section =
-  'explorer' | 'viewer' | 'review' | 'compare' | 'analysis' | 'drawings' | 'lab';
+  'explorer' | 'viewer' | 'review' | 'compare' | 'analysis' | 'drawings' | 'coordination' | 'lab';
 export type PanelSide = 'left' | 'right' | 'bottom';
 /** What the workspace shows: the 3D model, or a drawing sheet over it. */
 export type Workspace = 'model' | 'sheet';

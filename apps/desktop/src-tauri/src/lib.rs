@@ -3,7 +3,7 @@
 
 mod commands;
 
-use commands::{analysis, compare, drawings, model, project, review, views};
+use commands::{analysis, clash, compare, drawings, model, project, review, views};
 
 pub fn run() {
     tauri::Builder::default()
@@ -63,6 +63,12 @@ pub fn run() {
             drawings::sheet_markups,
             drawings::sheet_markup_add,
             drawings::sheet_markup_delete,
+            clash::clash_tests,
+            clash::clash_test_create,
+            clash::clash_test_delete,
+            clash::clash_run_record,
+            clash::clash_list,
+            clash::clash_set_status,
         ])
         .run(tauri::generate_context!())
         .expect("failed to start KingPost Connect");
