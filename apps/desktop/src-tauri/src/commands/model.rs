@@ -250,11 +250,16 @@ mod tests {
 
     #[test]
     fn rejects_paths_that_leave_the_project() {
-        let root = Path::new("C:/projects/bridge");
-        assert!(resolve_in_root(root, "models/a.ifc").is_ok());
-        assert!(resolve_in_root(root, "../secrets.txt").is_err());
-        assert!(resolve_in_root(root, "C:/windows/system32").is_err());
-        assert!(resolve_in_root(root, "models/../../x").is_err());
+        // Absolute on every platform; the test must not assume Windows drive letters.
+        let root = std::env::temp_dir().join("bridge");
+        let outside = std::env::temp_dir().join("elsewhere");
+        assert_eq!(
+            resolve_in_root(&root, "models/a.ifc").unwrap(),
+            root.join("models").join("a.ifc")
+        );
+        assert!(resolve_in_root(&root, "../secrets.txt").is_err());
+        assert!(resolve_in_root(&root, outside.to_str().unwrap()).is_err());
+        assert!(resolve_in_root(&root, "models/../../x").is_err());
     }
 
     #[test]
