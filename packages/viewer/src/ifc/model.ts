@@ -90,11 +90,21 @@ export class IfcModel {
     if (expressId !== null) this.repaint(expressId);
   }
 
-  /** Replaces the per-element tint map (null or empty clears it). */
-  setTints(tints: Map<number, THREE.Color> | null): void {
+  /** Replaces the per-element tint map (null or empty clears it). Colours are CSS strings or hex numbers. */
+  setTints(tints: Map<number, THREE.ColorRepresentation> | null): void {
     const touched = new Set<number>([...this.tints.keys(), ...(tints?.keys() ?? [])]);
     this.tints.clear();
-    if (tints) for (const [id, color] of tints) this.tints.set(id, color);
+    if (tints) {
+      const cache = new Map<THREE.ColorRepresentation, THREE.Color>();
+      for (const [id, value] of tints) {
+        let color = cache.get(value);
+        if (!color) {
+          color = new THREE.Color(value);
+          cache.set(value, color);
+        }
+        this.tints.set(id, color);
+      }
+    }
     for (const id of touched) this.repaint(id);
   }
 

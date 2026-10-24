@@ -8,16 +8,52 @@ export interface PickResult {
   expressId?: number;
 }
 
+export type ViewDirection = 'iso' | 'top' | 'front' | 'back' | 'left' | 'right';
+
+/** An axis-aligned section plane in world metres. */
+export interface SectionSpec {
+  axis: 'x' | 'y' | 'z';
+  position: number;
+  /** false keeps the side below/behind the plane; true keeps the other side. */
+  flip: boolean;
+}
+
+export type PickMode = 'select' | 'point';
+
+/** A world-space point picked on the model surface. */
+export interface PointPick {
+  point: THREE.Vector3;
+  expressId?: number;
+}
+
 /** The part of the scene controller that application code is allowed to drive. */
 export interface ViewportHandle {
   add(object: THREE.Object3D): void;
   remove(object: THREE.Object3D): void;
   clear(): void;
+  /** Overlay objects (measurements, markers) live above the content and survive `clear`. */
+  addOverlay(object: THREE.Object3D): void;
+  clearOverlay(): void;
+  setPickMode(mode: PickMode): void;
   fit(): void;
-  fitTo(box: THREE.Box3): void;
+  fitTo(box: THREE.Box3, direction?: ViewDirection): void;
+  viewFrom(direction: ViewDirection): void;
+  contentBounds(): THREE.Box3;
+  /** Extent of the content along one axis, for section sliders. */
+  extent(axis: 'x' | 'y' | 'z'): { min: number; max: number };
+  setSection(section: SectionSpec | null): void;
   select(object: THREE.Mesh | null): void;
   render(): void;
 }
+
+const VIEW_DIRECTIONS: Record<ViewDirection, THREE.Vector3> = {
+  iso: new THREE.Vector3(1, 0.8, 1.2),
+  top: new THREE.Vector3(0, 1, 0.0001),
+  front: new THREE.Vector3(0, 0, 1),
+  back: new THREE.Vector3(0, 0, -1),
+  left: new THREE.Vector3(-1, 0, 0),
+  right: new THREE.Vector3(1, 0, 0),
+};
 
 /** Meshes may resolve their own picks (e.g. an element inside a merged IFC mesh). */
 interface PickableUserData {
@@ -42,8 +78,12 @@ export class SceneController implements ViewportHandle {
   readonly controls: OrbitControls;
   /** Everything loaded by the application lives under this group. */
   readonly content = new THREE.Group();
+  /** Measurements and other annotations; not part of the model's bounds. */
+  readonly overlay = new THREE.Group();
 
   onPick: ((hit: PickResult | null) => void) | null = null;
+  onPickPoint: ((pick: PointPick) => void) | null = null;
+  private pickMode: PickMode = 'select';
 
   private readonly raycaster = new THREE.Raycaster();
   private readonly resizeObserver: ResizeObserver;
@@ -82,6 +122,7 @@ export class SceneController implements ViewportHandle {
     this.scene.add(grid);
     this.scene.add(new THREE.AxesHelper(2));
     this.scene.add(this.content);
+    this.scene.add(this.overlay);
 
     this.applyTheme();
 
@@ -114,6 +155,24 @@ export class SceneController implements ViewportHandle {
     this.requestRender();
   }
 
+  addOverlay(object: THREE.Object3D): void {
+    this.overlay.add(object);
+    this.requestRender();
+  }
+
+  clearOverlay(): void {
+    for (const child of [...this.overlay.children]) {
+      this.overlay.remove(child);
+      disposeTree(child);
+    }
+    this.requestRender();
+  }
+
+  setPickMode(mode: PickMode): void {
+    this.pickMode = mode;
+    this.canvas.style.cursor = mode === 'point' ? 'crosshair' : '';
+  }
+
   clear(): void {
     this.select(null);
     for (const child of [...this.content.children]) {
@@ -123,26 +182,63 @@ export class SceneController implements ViewportHandle {
     this.requestRender();
   }
 
-  /** Frames the loaded content; falls back to a sensible default when nothing is loaded. */
-  fit(): void {
+  /** Bounds of everything loaded; a default box when the scene is empty. */
+  contentBounds(): THREE.Box3 {
     const box = new THREE.Box3().setFromObject(this.content);
     if (box.isEmpty()) {
       box.set(new THREE.Vector3(-8, 0, -8), new THREE.Vector3(8, 6, 8));
     }
-    this.fitTo(box);
+    return box;
   }
 
-  /** Frames a world-space box, keeping the current viewing direction. */
-  fitTo(box: THREE.Box3): void {
+  /** Frames the loaded content, keeping the current viewing direction. */
+  fit(): void {
+    this.fitTo(this.contentBounds());
+  }
+
+  /** Looks at the whole model from a standard direction. */
+  viewFrom(direction: ViewDirection): void {
+    this.fitTo(this.contentBounds(), direction);
+  }
+
+  extent(axis: 'x' | 'y' | 'z'): { min: number; max: number } {
+    const box = this.contentBounds();
+    return { min: box.min[axis], max: box.max[axis] };
+  }
+
+  /** One global section plane, or none. */
+  setSection(section: SectionSpec | null): void {
+    if (!section) {
+      this.renderer.clippingPlanes = [];
+    } else {
+      const normal = new THREE.Vector3(
+        section.axis === 'x' ? 1 : 0,
+        section.axis === 'y' ? 1 : 0,
+        section.axis === 'z' ? 1 : 0,
+      );
+      // A plane keeps points where normal·p + constant >= 0; unflipped keeps the lower side.
+      this.renderer.clippingPlanes = [
+        section.flip
+          ? new THREE.Plane(normal, -section.position)
+          : new THREE.Plane(normal.negate(), section.position),
+      ];
+    }
+    this.requestRender();
+  }
+
+  /** Frames a world-space box, from `direction` or else the current viewing direction. */
+  fitTo(box: THREE.Box3, direction?: ViewDirection): void {
     const center = box.getCenter(new THREE.Vector3());
     const size = box.getSize(new THREE.Vector3());
     const radius = Math.max(size.x, size.y, size.z, 1) * 0.5;
     const distance = (radius / Math.tan(THREE.MathUtils.degToRad(this.camera.fov) / 2)) * 1.25;
 
-    const direction = this.camera.position.clone().sub(this.controls.target);
-    if (direction.lengthSq() < 1e-6) direction.set(1, 0.8, 1.2);
-    direction.normalize();
-    this.camera.position.copy(center).addScaledVector(direction, distance);
+    const towardCamera = direction
+      ? VIEW_DIRECTIONS[direction].clone()
+      : this.camera.position.clone().sub(this.controls.target);
+    if (towardCamera.lengthSq() < 1e-6) towardCamera.set(1, 0.8, 1.2);
+    towardCamera.normalize();
+    this.camera.position.copy(center).addScaledVector(towardCamera, distance);
     this.camera.near = Math.max(distance / 1000, 0.01);
     this.camera.far = distance * 50;
     this.camera.updateProjectionMatrix();
@@ -176,6 +272,7 @@ export class SceneController implements ViewportHandle {
     this.controls.removeEventListener('change', this.requestRender);
     this.controls.dispose();
     this.clear();
+    this.clearOverlay();
     this.renderer.dispose();
   }
 
@@ -226,6 +323,18 @@ export class SceneController implements ViewportHandle {
     const hit = this.raycaster
       .intersectObjects(this.content.children, true)
       .find((h) => (h.object as THREE.Mesh).isMesh && h.object.visible);
+
+    if (this.pickMode === 'point') {
+      if (!hit) return;
+      const pickable = hit.object.userData as PickableUserData;
+      const resolved = pickable.resolvePick?.(hit.faceIndex ?? 0);
+      this.onPickPoint?.({
+        point: hit.point.clone(),
+        ...(resolved?.expressId !== undefined ? { expressId: resolved.expressId } : {}),
+      });
+      return;
+    }
+
     if (!hit) {
       this.select(null);
       this.onPick?.(null);
@@ -267,10 +376,13 @@ function highlighted(material: THREE.Material): THREE.Material {
 
 function disposeTree(root: THREE.Object3D): void {
   root.traverse((object) => {
-    const mesh = object as THREE.Mesh;
-    if (!mesh.isMesh) return;
-    mesh.geometry.dispose();
-    const materials = Array.isArray(mesh.material) ? mesh.material : [mesh.material];
-    for (const material of materials) material.dispose();
+    const drawable = object as THREE.Mesh | THREE.Line | THREE.Sprite;
+    if (!('geometry' in drawable) || !('material' in drawable)) return;
+    drawable.geometry.dispose();
+    const materials = Array.isArray(drawable.material) ? drawable.material : [drawable.material];
+    for (const material of materials) {
+      if ('map' in material && material.map instanceof THREE.Texture) material.map.dispose();
+      material.dispose();
+    }
   });
 }
