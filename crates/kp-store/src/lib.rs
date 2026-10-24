@@ -11,11 +11,13 @@ use std::path::Path;
 use rusqlite::{Connection, OpenFlags, OptionalExtension, params};
 
 mod content;
+mod diff;
 mod migrations;
 mod review;
 mod views;
 
 pub use content::{ElementRow, ElementSummary, FileRow, PropertyOut, PropertyRow, RevisionRow};
+pub use diff::{DiffItemRow, DiffResultRow, PropertyFact};
 pub use review::{
     CommentRow, IssuePatch, IssueRow, NewIssue, NewViewpoint, STAGES, StatusRow, ViewpointRow,
 };
