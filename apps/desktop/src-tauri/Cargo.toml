@@ -19,3 +19,5 @@ tauri-plugin-dialog = "2"
 serde.workspace = true
 serde_json.workspace = true
 kp-project = { path = "../../../crates/kp-project" }
+kp-store = { path = "../../../crates/kp-store" }
+kp-ifc = { path = "../../../crates/kp-ifc" }

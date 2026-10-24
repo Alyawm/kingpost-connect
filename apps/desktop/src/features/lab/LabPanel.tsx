@@ -30,7 +30,7 @@ export function LabPanel() {
       const data = new Uint8Array(await file.arrayBuffer());
       const result = await loadIfcToGroup(data);
       handle.clear();
-      handle.add(result.group);
+      handle.add(result.model.group);
       handle.fit();
       setStats(result.stats);
       setHeapMb(usedHeapMb());

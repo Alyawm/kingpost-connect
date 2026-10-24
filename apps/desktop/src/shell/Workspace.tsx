@@ -1,6 +1,12 @@
 import { useCallback } from 'react';
-import { Viewport, createSampleFrame, type ViewportHandle } from '@kingpost/viewer';
+import {
+  Viewport,
+  createSampleFrame,
+  type PickResult,
+  type ViewportHandle,
+} from '@kingpost/viewer';
 import { useViewer } from '../state/viewer';
+import { useModel } from '../state/model';
 
 /**
  * The 3D viewport. Mounted once for the life of the window so the WebGL context and
@@ -13,7 +19,7 @@ export function Workspace() {
   const onReady = useCallback(
     (handle: ViewportHandle | null) => {
       setHandle(handle);
-      if (handle) {
+      if (handle && !useModel.getState().model) {
         handle.add(createSampleFrame());
         handle.fit();
       }
@@ -21,5 +27,13 @@ export function Workspace() {
     [setHandle],
   );
 
-  return <Viewport onReady={onReady} onSelect={setSelection} />;
+  const onSelect = useCallback(
+    (hit: PickResult | null) => {
+      setSelection(hit);
+      useModel.getState().onPick(hit);
+    },
+    [setSelection],
+  );
+
+  return <Viewport onReady={onReady} onSelect={onSelect} />;
 }
