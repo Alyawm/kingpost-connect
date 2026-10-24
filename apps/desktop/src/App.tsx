@@ -4,6 +4,8 @@ import { useShortcuts } from './shell/useShortcuts';
 import { useUi } from './state/ui';
 import { useApp } from './state/app';
 import { useProject } from './state/project';
+import { useLicence } from './state/licence';
+import { checkAtStartupIfEnabled } from './state/updates';
 
 export function App() {
   const theme = useUi((s) => s.theme);
@@ -16,6 +18,8 @@ export function App() {
 
   useEffect(() => {
     void loadInfo();
+    void useLicence.getState().refresh();
+    checkAtStartupIfEnabled();
     // The shell may start with a project already open (see AppState::from_environment).
     void refreshProject();
   }, [loadInfo, refreshProject]);

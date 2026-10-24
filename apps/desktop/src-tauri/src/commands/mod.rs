@@ -9,9 +9,12 @@ use std::sync::{Arc, Mutex, MutexGuard};
 use kp_project::Project;
 
 pub mod analysis;
+pub mod cache;
 pub mod clash;
 pub mod compare;
+pub mod diagnostics;
 pub mod drawings;
+pub mod licence;
 pub mod model;
 pub mod project;
 pub mod review;

@@ -7,6 +7,8 @@ import { Inspector } from './Inspector';
 import { OutputPanel } from './OutputPanel';
 import { StatusBar } from './StatusBar';
 import { CommandPalette } from './CommandPalette';
+import { SettingsDialog } from './SettingsDialog';
+import { HelpDialog } from './HelpDialog';
 
 /**
  * Window layout: activity rail · side panel · workspace (+ output below) · inspector,
@@ -46,6 +48,8 @@ export function AppShell() {
       </div>
       <StatusBar />
       <CommandPalette />
+      <SettingsDialog />
+      <HelpDialog />
     </div>
   );
 }

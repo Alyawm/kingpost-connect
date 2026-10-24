@@ -996,3 +996,62 @@ export function clashSetStatus(
 ): Promise<boolean> {
   return invoke<boolean>('clash_set_status', { id, status, note });
 }
+
+// ---- Productisation: licence, diagnostics, geometry cache ----
+
+export interface Licence {
+  name: string;
+  organisation: string | null;
+  edition: string;
+  seats: number;
+  issued: string;
+  expires: string | null;
+  reference: string;
+}
+
+export type LicenceStatus =
+  | { state: 'evaluation' }
+  | { state: 'valid'; licence: Licence; days_left: number | null }
+  | { state: 'expired'; licence: Licence }
+  | { state: 'invalid'; reason: string };
+
+export function licenceStatus(): Promise<LicenceStatus> {
+  if (!isTauri()) return Promise.resolve({ state: 'evaluation' });
+  return invoke<LicenceStatus>('licence_status');
+}
+
+export function licenceInstall(key: string): Promise<LicenceStatus> {
+  return invoke<LicenceStatus>('licence_install', { key });
+}
+
+export function licenceRemove(): Promise<LicenceStatus> {
+  return invoke<LicenceStatus>('licence_remove');
+}
+
+export function logAppend(lines: string[]): Promise<void> {
+  if (!isTauri() || lines.length === 0) return Promise.resolve();
+  return invoke<void>('log_append', { lines });
+}
+
+export interface BundleSummary {
+  path: string;
+  files: number;
+  bytes: number;
+}
+
+export function diagnosticsBundle(path: string): Promise<BundleSummary> {
+  return invoke<BundleSummary>('diagnostics_bundle', { path });
+}
+
+export async function geometryCacheRead(sha256: string): Promise<Uint8Array> {
+  const buffer = await invoke<ArrayBuffer>('geometry_cache_read', { sha256 });
+  return new Uint8Array(buffer);
+}
+
+export function geometryCacheWrite(sha256: string, data: Uint8Array): Promise<number> {
+  return invoke<number>('geometry_cache_write', { sha256, data: Array.from(data) });
+}
+
+export function geometryCacheClear(): Promise<number> {
+  return invoke<number>('geometry_cache_clear');
+}

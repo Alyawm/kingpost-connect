@@ -1,7 +1,7 @@
 {
   "name": "@kingpost/desktop",
   "private": true,
-  "version": "0.6.0",
+  "version": "1.0.0",
   "type": "module",
   "description": "KingPost Connect desktop application (Tauri shell and React interface).",
   "scripts": {
@@ -19,6 +19,8 @@
     "@kingpost/viewer": "workspace:*",
     "@tauri-apps/api": "^2.6.0",
     "@tauri-apps/plugin-dialog": "^2.3.0",
+    "@tauri-apps/plugin-process": "2.3.0",
+    "@tauri-apps/plugin-updater": "2.9.0",
     "cmdk": "^1.1.1",
     "lucide-react": "^0.525.0",
     "pdfjs-dist": "5.4.149",

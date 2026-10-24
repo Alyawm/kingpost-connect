@@ -1,10 +1,13 @@
 import { create } from 'zustand';
 import {
   loadIfcToGroup,
-  type IfcFrame,
+  IfcFrame,
   type IfcModel,
   type PickModifiers,
   type PickResult,
+  deserializeBuckets,
+  modelFromCache,
+  serializeBuckets,
 } from '@kingpost/viewer';
 import {
   elementDetails,
@@ -13,6 +16,8 @@ import {
   type ElementDetails,
   type ElementSummary,
   type RevisionRow,
+  geometryCacheRead,
+  geometryCacheWrite,
 } from '../lib/ipc';
 import { log } from './log';
 import { useViewer } from './viewer';
@@ -49,6 +54,46 @@ interface ModelState {
   selectedGlobalIds(): string[];
 }
 
+/**
+ * Geometry for a revision: from the project's cache when it has been opened before, else
+ * from web-ifc, in which case the result is cached for next time. The cache is keyed by
+ * the file digest the revision was imported from, so a changed file never matches.
+ */
+async function loadGeometry(
+  relPath: string,
+  revision: RevisionRow,
+): Promise<{ model: IfcModel; frame: IfcFrame; triangles: number; source: string }> {
+  const sha = revision.source_sha256;
+  try {
+    const cached = sha ? deserializeBuckets(await geometryCacheRead(sha)) : null;
+    if (cached) {
+      return {
+        model: modelFromCache(cached),
+        frame: new IfcFrame(cached.coordination),
+        triangles: cached.triangles,
+        source: 'cache',
+      };
+    }
+  } catch {
+    // A damaged cache file is not an error: the file is simply read again.
+  }
+  const bytes = await readProjectFile(relPath);
+  const { model, stats, frame, coordination } = await loadIfcToGroup(bytes);
+  if (sha) {
+    // Written after the model is shown; a failure only means the next open is slower.
+    setTimeout(() => {
+      try {
+        void geometryCacheWrite(sha, serializeBuckets(model.buckets, coordination)).catch(
+          () => undefined,
+        );
+      } catch {
+        // ignore
+      }
+    }, 0);
+  }
+  return { model, frame, triangles: stats.triangles, source: 'web-ifc' };
+}
+
 export const useModel = create<ModelState>((set, get) => ({
   revision: null,
   relPath: null,
@@ -74,11 +119,8 @@ export const useModel = create<ModelState>((set, get) => ({
     log.info(`Loading ${relPath} (revision ${revision.idx})…`);
     try {
       const started = performance.now();
-      const [bytes, elements] = await Promise.all([
-        readProjectFile(relPath),
-        revisionElements(revision.id),
-      ]);
-      const { model, stats, frame } = await loadIfcToGroup(bytes);
+      const elements = await revisionElements(revision.id);
+      const { model, frame, triangles, source } = await loadGeometry(relPath, revision);
       handle.clear();
       handle.add(model.group);
       handle.fit();
@@ -87,7 +129,7 @@ export const useModel = create<ModelState>((set, get) => ({
       set({ model, frame, elements, byId, byGlobalId, loading: false });
       log.info(
         `${relPath}: ${elements.length.toLocaleString()} elements, ` +
-          `${stats.triangles.toLocaleString()} triangles in ${Math.round(performance.now() - started)} ms`,
+          `${triangles.toLocaleString()} triangles in ${Math.round(performance.now() - started)} ms (${source})`,
       );
     } catch (error) {
       set({ loading: false });

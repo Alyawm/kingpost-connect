@@ -18,6 +18,14 @@ interface UiState {
   rightOpen: boolean;
   bottomOpen: boolean;
   paletteOpen: boolean;
+  settingsOpen: boolean;
+  helpOpen: boolean;
+  /** Ask the release server for a newer version when the application starts. Off by default. */
+  checkUpdatesAtStartup: boolean;
+  /** Project folders opened before, newest first. */
+  recentProjects: string[];
+  /** The getting-started checklist is shown until dismissed. */
+  onboardingDismissed: boolean;
   setTheme(theme: Theme): void;
   toggleTheme(): void;
   setAuthor(author: string): void;
@@ -25,6 +33,12 @@ interface UiState {
   setWorkspace(workspace: Workspace): void;
   togglePanel(side: PanelSide): void;
   setPalette(open: boolean): void;
+  setSettingsOpen(open: boolean): void;
+  setHelpOpen(open: boolean): void;
+  setCheckUpdatesAtStartup(on: boolean): void;
+  rememberProject(root: string): void;
+  forgetProject(root: string): void;
+  dismissOnboarding(): void;
 }
 
 const panelKey: Record<PanelSide, 'leftOpen' | 'rightOpen' | 'bottomOpen'> = {
@@ -45,6 +59,11 @@ export const useUi = create<UiState>()(
       rightOpen: true,
       bottomOpen: true,
       paletteOpen: false,
+      settingsOpen: false,
+      helpOpen: false,
+      checkUpdatesAtStartup: false,
+      recentProjects: [],
+      onboardingDismissed: false,
       setTheme: (theme) => set({ theme }),
       toggleTheme: () => set({ theme: get().theme === 'dark' ? 'light' : 'dark' }),
       setAuthor: (author) => set({ author }),
@@ -56,6 +75,16 @@ export const useUi = create<UiState>()(
       setWorkspace: (workspace) => set({ workspace }),
       togglePanel: (side) => set({ [panelKey[side]]: !get()[panelKey[side]] }),
       setPalette: (paletteOpen) => set({ paletteOpen }),
+      setSettingsOpen: (settingsOpen) => set({ settingsOpen }),
+      setHelpOpen: (helpOpen) => set({ helpOpen }),
+      setCheckUpdatesAtStartup: (checkUpdatesAtStartup) => set({ checkUpdatesAtStartup }),
+      rememberProject: (root) =>
+        set({
+          recentProjects: [root, ...get().recentProjects.filter((r) => r !== root)].slice(0, 8),
+        }),
+      forgetProject: (root) =>
+        set({ recentProjects: get().recentProjects.filter((r) => r !== root) }),
+      dismissOnboarding: () => set({ onboardingDismissed: true }),
     }),
     {
       name: 'kingpost.ui',
@@ -65,6 +94,9 @@ export const useUi = create<UiState>()(
         leftOpen: s.leftOpen,
         rightOpen: s.rightOpen,
         bottomOpen: s.bottomOpen,
+        checkUpdatesAtStartup: s.checkUpdatesAtStartup,
+        recentProjects: s.recentProjects,
+        onboardingDismissed: s.onboardingDismissed,
       }),
     },
   ),

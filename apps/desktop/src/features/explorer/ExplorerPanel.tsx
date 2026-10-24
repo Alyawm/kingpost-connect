@@ -1,9 +1,10 @@
 import { useEffect } from 'react';
-import { Box, Download, FileText, FolderOpen, RefreshCw, Sheet, X } from 'lucide-react';
+import { Box, Download, FileText, RefreshCw, Sheet, X } from 'lucide-react';
 import { Button, IconButton, Panel, PanelBody, PanelHeader, cn } from '@kingpost/ui';
 import { useProject } from '../../state/project';
 import { useModel } from '../../state/model';
 import { useUi } from '../../state/ui';
+import { GettingStarted, Welcome } from './Welcome';
 import { formatBytes, formatCount, formatIsoDate } from '../../lib/format';
 import type { FileKind, ProjectFile, RevisionRow } from '../../lib/ipc';
 
@@ -17,9 +18,7 @@ const kindIcon: Record<FileKind, typeof Box> = {
 
 export function ExplorerPanel() {
   const project = useProject((s) => s.current);
-  const busy = useProject((s) => s.busy);
   const files = useProject((s) => s.files);
-  const openFolder = useProject((s) => s.openFolder);
   const close = useProject((s) => s.close);
   const refreshFiles = useProject((s) => s.refreshFiles);
 
@@ -51,6 +50,7 @@ export function ExplorerPanel() {
               <div className="text-sm font-semibold">{project.name}</div>
               <div className="break-all font-mono text-[11px] text-fg-muted">{project.root}</div>
             </div>
+            <GettingStarted />
             {files.length === 0 ? (
               <p className="p-3 text-xs text-fg-muted">
                 No models or drawings found. Copy IFC, PDF, SAF (.xlsx), ETABS (.e2k) or SAP2000
@@ -65,16 +65,7 @@ export function ExplorerPanel() {
             )}
           </div>
         ) : (
-          <div className="space-y-3 p-3">
-            <p className="text-xs text-fg-muted">
-              A project is a folder on disk. Choose an empty folder to start one, or a folder that
-              already holds a project to open it.
-            </p>
-            <Button variant="primary" onClick={() => void openFolder()} disabled={busy}>
-              <FolderOpen size={14} />
-              Open project folder…
-            </Button>
-          </div>
+          <Welcome />
         )}
       </PanelBody>
     </Panel>

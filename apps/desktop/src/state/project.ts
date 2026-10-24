@@ -14,6 +14,7 @@ import {
   type ProjectInfo,
 } from '../lib/ipc';
 import { log } from './log';
+import { useUi } from './ui';
 import { useModel } from './model';
 
 interface ProjectState {
@@ -26,6 +27,8 @@ interface ProjectState {
   refreshFiles(): Promise<void>;
   /** Lets the user pick a folder; opens it as a project, creating one if it is plain. */
   openFolder(): Promise<void>;
+  /** Opens a known folder without the picker (recent projects). */
+  openPath(root: string): Promise<void>;
   close(): Promise<void>;
   importFile(relPath: string): Promise<ImportSummary | null>;
   /** Refreshes the file list when the shell reports changes in the project folder. */
@@ -77,7 +80,31 @@ export const useProject = create<ProjectState>((set, get) => ({
       const info = existing ? await projectOpen(root) : await projectCreate(root, folderName(root));
       useModel.getState().clear();
       set({ current: info });
+      useUi.getState().rememberProject(info.root);
       log.info(`${existing ? 'Opened' : 'Created'} project "${info.name}" at ${info.root}`);
+      await get().refreshFiles();
+    } catch (error) {
+      log.error(String(error));
+    } finally {
+      set({ busy: false });
+    }
+  },
+
+  openPath: async (root) => {
+    if (!isTauri()) return;
+    set({ busy: true });
+    try {
+      const existing = await projectIsProject(root);
+      if (!existing) {
+        log.warn(`${root} is no longer a project folder.`);
+        useUi.getState().forgetProject(root);
+        return;
+      }
+      const info = await projectOpen(root);
+      useModel.getState().clear();
+      set({ current: info });
+      useUi.getState().rememberProject(info.root);
+      log.info(`Opened project "${info.name}" at ${info.root}`);
       await get().refreshFiles();
     } catch (error) {
       log.error(String(error));

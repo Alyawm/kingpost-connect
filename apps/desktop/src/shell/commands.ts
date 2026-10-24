@@ -1,4 +1,5 @@
 import { useProject } from '../state/project';
+import { useUpdates } from '../state/updates';
 import { useUi, type Section } from '../state/ui';
 import { useViewer } from '../state/viewer';
 
@@ -55,6 +56,26 @@ export function listCommands(): Command[] {
           },
         ]
       : []),
+    {
+      id: 'app.settings',
+      title: 'Settings…',
+      group: 'Application',
+      shortcut: 'Ctrl+,',
+      run: () => ui.setSettingsOpen(true),
+    },
+    {
+      id: 'app.help',
+      title: 'Help and shortcuts',
+      group: 'Application',
+      shortcut: 'F1',
+      run: () => ui.setHelpOpen(true),
+    },
+    {
+      id: 'app.updates',
+      title: 'Check for updates',
+      group: 'Application',
+      run: () => void useUpdates.getState().check(),
+    },
     {
       id: 'view.fit',
       title: 'Fit model in view',

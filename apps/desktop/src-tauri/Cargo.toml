@@ -16,6 +16,10 @@ tauri-build = { version = "2", features = [] }
 [dependencies]
 tauri = { version = "2", features = [] }
 tauri-plugin-dialog = "2"
+tauri-plugin-updater = "2"
+tauri-plugin-process = "2"
+zip = { version = "2", default-features = false, features = ["deflate"] }
+time = { workspace = true, features = ["macros", "formatting"] }
 serde.workspace = true
 serde_json.workspace = true
 uuid.workspace = true
@@ -27,4 +31,5 @@ kp-ifc = { path = "../../../crates/kp-ifc" }
 kp-bcf = { path = "../../../crates/kp-bcf" }
 kp-diff = { path = "../../../crates/kp-diff" }
 kp-analysis = { path = "../../../crates/kp-analysis" }
+kp-licence = { path = "../../../crates/kp-licence" }
 sha2.workspace = true

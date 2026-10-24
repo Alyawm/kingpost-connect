@@ -3,11 +3,15 @@
 
 mod commands;
 
-use commands::{analysis, clash, compare, drawings, model, project, review, views};
+use commands::{
+    analysis, cache, clash, compare, diagnostics, drawings, licence, model, project, review, views,
+};
 
 pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_dialog::init())
+        .plugin(tauri_plugin_updater::Builder::new().build())
+        .plugin(tauri_plugin_process::init())
         .manage(commands::AppState::from_environment())
         .invoke_handler(tauri::generate_handler![
             project::app_info,
@@ -69,6 +73,14 @@ pub fn run() {
             clash::clash_run_record,
             clash::clash_list,
             clash::clash_set_status,
+            diagnostics::log_append,
+            diagnostics::diagnostics_bundle,
+            licence::licence_status,
+            licence::licence_install,
+            licence::licence_remove,
+            cache::geometry_cache_read,
+            cache::geometry_cache_write,
+            cache::geometry_cache_clear,
         ])
         .run(tauri::generate_context!())
         .expect("failed to start KingPost Connect");
