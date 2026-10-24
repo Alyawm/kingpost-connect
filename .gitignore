@@ -36,3 +36,6 @@ samples/**/*.s2k
 # Logs and caches
 *.log
 .cache/
+
+# Project data the application writes inside any folder opened as a project
+.kingpost/
