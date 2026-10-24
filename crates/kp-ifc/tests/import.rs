@@ -18,10 +18,10 @@ fn reads_elements_spatial_structure_types_and_materials() {
     let model = parse_bytes(PORTAL).unwrap();
     assert_eq!(model.schema, "IFC4");
     assert_eq!(
-        model.stats.spatial, 5,
-        "project, site, building, two storeys"
+        model.stats.spatial, 6,
+        "project, site, building, two storeys, one space"
     );
-    assert_eq!(model.stats.elements, 3, "one column, two beams");
+    assert_eq!(model.stats.elements, 4, "one column, two beams, one plate");
 
     let column = element(&model, 50);
     assert_eq!(column.ifc_type, "IFCCOLUMN");
@@ -46,6 +46,18 @@ fn reads_elements_spatial_structure_types_and_materials() {
     assert_eq!(
         beam_without_geometry.type_name.as_deref(),
         Some("UB 406x178x54")
+    );
+
+    let plate = element(&model, 63);
+    assert_eq!(
+        plate.storey.as_deref(),
+        Some("Ground floor"),
+        "contained in a space; the storey comes from the space's aggregation"
+    );
+    assert_eq!(
+        element(&model, 38).parent,
+        Some(34),
+        "space aggregated under its storey"
     );
 
     let storey = element(&model, 36);
@@ -133,7 +145,7 @@ fn imports_into_the_store_and_reads_back() {
     assert_eq!(files[0].kind, "ifc");
 
     let elements = store.elements(summary.revision_id).unwrap();
-    assert_eq!(elements.len(), 8);
+    assert_eq!(elements.len(), 10);
     let roof = elements.iter().find(|e| e.express_id == 36).unwrap();
     assert_eq!(
         roof.parent_express_id,
@@ -159,5 +171,5 @@ fn imports_into_the_store_and_reads_back() {
     assert_eq!(again.file_id, summary.file_id);
     assert_eq!(again.revision_index, 2);
     assert_eq!(store.revisions(Some(summary.file_id)).unwrap().len(), 2);
-    assert_eq!(store.revisions(None).unwrap()[1].element_count, 8);
+    assert_eq!(store.revisions(None).unwrap()[1].element_count, 10);
 }

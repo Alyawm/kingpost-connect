@@ -195,8 +195,22 @@ pub fn extract(step: &StepFile, scan_ms: u64) -> IfcModel {
             container.insert(element, structure);
         }
     }
-    let spatial_name =
-        |id: u32| -> Option<String> { index.get(&id).and_then(|&i| elements[i].name.clone()) };
+    // The storey a container belongs to: a storey is itself; a space (or any other
+    // spatial element) walks up its aggregation chain; the top of the chain names itself.
+    let spatial_name = |container: u32| -> Option<String> {
+        let mut id = container;
+        for _ in 0..8 {
+            let element = &elements[*index.get(&id)?];
+            if element.ifc_type == "IFCBUILDINGSTOREY" {
+                return element.name.clone();
+            }
+            match element.parent {
+                Some(parent) if parent != id && index.contains_key(&parent) => id = parent,
+                _ => return element.name.clone(),
+            }
+        }
+        None
+    };
     let resolved: Vec<Option<String>> = elements
         .iter()
         .map(|element| {
