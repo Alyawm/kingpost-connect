@@ -1,0 +1,29 @@
+{
+  "name": "@kingpost/viewer",
+  "private": true,
+  "version": "0.0.1",
+  "type": "module",
+  "description": "3D viewport for KingPost Connect: three.js scene, picking, and IFC geometry loading.",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit -p tsconfig.json",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "three": "^0.178.0",
+    "web-ifc": "^0.0.69"
+  },
+  "peerDependencies": {
+    "react": "^19.0.0"
+  },
+  "devDependencies": {
+    "@types/react": "^19.1.8",
+    "@types/three": "^0.178.0",
+    "react": "^19.1.0",
+    "typescript": "^5.8.3",
+    "vite": "^7.0.4",
+    "vitest": "^3.2.4"
+  }
+}
