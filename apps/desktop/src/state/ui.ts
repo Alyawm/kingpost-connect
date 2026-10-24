@@ -5,12 +5,15 @@ export type Theme = 'dark' | 'light';
 export type Section =
   'explorer' | 'viewer' | 'review' | 'compare' | 'analysis' | 'drawings' | 'lab';
 export type PanelSide = 'left' | 'right' | 'bottom';
+/** What the workspace shows: the 3D model, or a drawing sheet over it. */
+export type Workspace = 'model' | 'sheet';
 
 interface UiState {
   theme: Theme;
   /** Name recorded on issues, comments and status changes. */
   author: string;
   section: Section;
+  workspace: Workspace;
   leftOpen: boolean;
   rightOpen: boolean;
   bottomOpen: boolean;
@@ -19,6 +22,7 @@ interface UiState {
   toggleTheme(): void;
   setAuthor(author: string): void;
   setSection(section: Section): void;
+  setWorkspace(workspace: Workspace): void;
   togglePanel(side: PanelSide): void;
   setPalette(open: boolean): void;
 }
@@ -36,6 +40,7 @@ export const useUi = create<UiState>()(
       theme: 'dark',
       author: '',
       section: 'explorer',
+      workspace: 'model',
       leftOpen: true,
       rightOpen: true,
       bottomOpen: true,
@@ -48,6 +53,7 @@ export const useUi = create<UiState>()(
         if (get().section === section) set({ leftOpen: !get().leftOpen });
         else set({ section, leftOpen: true });
       },
+      setWorkspace: (workspace) => set({ workspace }),
       togglePanel: (side) => set({ [panelKey[side]]: !get()[panelKey[side]] }),
       setPalette: (paletteOpen) => set({ paletteOpen }),
     }),

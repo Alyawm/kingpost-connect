@@ -734,3 +734,175 @@ export function analysisLinkOverride(
     axis,
   });
 }
+
+// ---- Drawings: PDF sheet sets, links to the model, markups ----
+
+export interface SheetRow {
+  id: number;
+  revision_id: number;
+  file_id: number;
+  rel_path: string;
+  revision_idx: number;
+  page: number;
+  number: string | null;
+  title: string | null;
+  scale: string | null;
+  width: number;
+  height: number;
+  has_thumbnail: boolean;
+  link_count: number;
+  markup_count: number;
+}
+
+export interface SheetHit {
+  sheet_id: number;
+  rel_path: string;
+  revision_idx: number;
+  page: number;
+  number: string | null;
+  title: string | null;
+  excerpt: string;
+}
+
+/** A rectangle in page fractions (0..1 from the top-left corner). */
+export interface SheetRegion {
+  x: number;
+  y: number;
+  w: number;
+  h: number;
+}
+
+export interface SheetLinkRow {
+  id: string;
+  sheet_id: number;
+  region_json: string;
+  element_global_id: string | null;
+  view_id: string | null;
+  label: string | null;
+  created_by: string;
+  created_at: string;
+}
+
+export interface ElementSheetLink {
+  link: SheetLinkRow;
+  rel_path: string;
+  revision_id: number;
+  revision_idx: number;
+  page: number;
+  number: string | null;
+  title: string | null;
+}
+
+export type SheetMarkupKind = 'rect' | 'cloud' | 'line' | 'arrow' | 'text';
+
+export interface SheetMarkupRow {
+  id: string;
+  sheet_id: number;
+  author: string;
+  kind: SheetMarkupKind | string;
+  geometry_json: string;
+  text: string | null;
+  created_at: string;
+}
+
+export interface SheetInput {
+  page: number;
+  number: string | null;
+  title: string | null;
+  scale: string | null;
+  width: number;
+  height: number;
+  text: string;
+  thumbnail: string | null;
+}
+
+export interface DrawingImport {
+  file_id: number;
+  revision_id: number;
+  revision_index: number;
+  previous_revision_id: number | null;
+}
+
+export function drawingImport(relPath: string): Promise<DrawingImport> {
+  return invoke<DrawingImport>('drawing_import', { relPath });
+}
+
+export function sheetsRegister(
+  revisionId: number,
+  sheets: SheetInput[],
+  carryFromRevisionId: number | null,
+): Promise<number> {
+  return invoke<number>('sheets_register', { revisionId, sheets, carryFromRevisionId });
+}
+
+export function sheetsList(revisionId?: number): Promise<SheetRow[]> {
+  if (!isTauri()) return Promise.resolve([]);
+  return invoke<SheetRow[]>('sheets_list', { revisionId: revisionId ?? null });
+}
+
+export function sheetThumbnail(sheetId: number): Promise<string | null> {
+  return invoke<string | null>('sheet_thumbnail', { sheetId });
+}
+
+export function sheetUpdate(
+  sheetId: number,
+  number: string | null,
+  title: string | null,
+  scale: string | null,
+): Promise<SheetRow> {
+  return invoke<SheetRow>('sheet_update', { sheetId, number, title, scale });
+}
+
+export function sheetsSearch(query: string, limit = 50): Promise<SheetHit[]> {
+  if (!isTauri()) return Promise.resolve([]);
+  return invoke<SheetHit[]>('sheets_search', { query, limit });
+}
+
+export function sheetLinks(sheetId: number): Promise<SheetLinkRow[]> {
+  return invoke<SheetLinkRow[]>('sheet_links', { sheetId });
+}
+
+export function elementSheetLinks(globalIds: string[]): Promise<ElementSheetLink[]> {
+  if (!isTauri() || globalIds.length === 0) return Promise.resolve([]);
+  return invoke<ElementSheetLink[]>('element_sheet_links', { globalIds });
+}
+
+export function sheetLinkCreate(
+  sheetId: number,
+  region: SheetRegion,
+  elementGlobalId: string | null,
+  viewId: string | null,
+  label: string | null,
+  author: string,
+): Promise<SheetLinkRow[]> {
+  return invoke<SheetLinkRow[]>('sheet_link_create', {
+    sheetId,
+    region,
+    elementGlobalId,
+    viewId,
+    label,
+    author,
+  });
+}
+
+export function sheetLinkDelete(id: string): Promise<boolean> {
+  return invoke<boolean>('sheet_link_delete', { id });
+}
+
+export function sheetMarkups(sheetId: number): Promise<SheetMarkupRow[]> {
+  return invoke<SheetMarkupRow[]>('sheet_markups', { sheetId });
+}
+
+export function sheetMarkupAdd(
+  sheetId: number,
+  kind: SheetMarkupKind,
+  geometry: unknown,
+  text: string | null,
+  author: string,
+): Promise<SheetMarkupRow[]> {
+  return invoke<SheetMarkupRow[]>('sheet_markup_add', { sheetId, kind, geometry, text, author });
+}
+
+export function sheetMarkupDelete(id: string): Promise<boolean> {
+  return invoke<boolean>('sheet_markup_delete', { id });
+}

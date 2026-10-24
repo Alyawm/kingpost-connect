@@ -11,6 +11,10 @@ import { useViewer } from '../state/viewer';
 import { useModel } from '../state/model';
 import { useView } from '../state/view';
 import { useAnalysis } from '../state/analysis';
+import { useDrawings } from '../state/drawings';
+import { useUi } from '../state/ui';
+import { SheetView } from '../features/drawings/SheetView';
+import { SheetCompare } from '../features/drawings/SheetCompare';
 
 /**
  * The 3D viewport. Mounted once for the life of the window so the WebGL context and
@@ -47,5 +51,18 @@ export function Workspace() {
     useView.getState().pickPoint(pick);
   }, []);
 
-  return <Viewport onReady={onReady} onSelect={onSelect} onPickPoint={onPickPoint} />;
+  const workspace = useUi((s) => s.workspace);
+  const sheetOpen = useDrawings((s) => s.open !== null);
+  const comparing = useDrawings((s) => s.compare !== null);
+  const showSheet = workspace === 'sheet' && (sheetOpen || comparing);
+
+  // The viewport stays mounted under a sheet so the loaded model survives the switch.
+  return (
+    <>
+      <div className={showSheet ? 'invisible absolute inset-0' : 'absolute inset-0'}>
+        <Viewport onReady={onReady} onSelect={onSelect} onPickPoint={onPickPoint} />
+      </div>
+      {showSheet && (comparing ? <SheetCompare /> : <SheetView />)}
+    </>
+  );
 }

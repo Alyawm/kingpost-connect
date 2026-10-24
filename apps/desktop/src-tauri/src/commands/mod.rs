@@ -10,6 +10,7 @@ use kp_project::Project;
 
 pub mod analysis;
 pub mod compare;
+pub mod drawings;
 pub mod model;
 pub mod project;
 pub mod review;

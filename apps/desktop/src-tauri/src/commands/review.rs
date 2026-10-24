@@ -88,7 +88,7 @@ pub struct BcfImportSummary {
     viewpoints_added: usize,
 }
 
-fn author_or_default(author: Option<String>) -> String {
+pub(crate) fn author_or_default(author: Option<String>) -> String {
     author
         .map(|a| a.trim().to_owned())
         .filter(|a| !a.is_empty())

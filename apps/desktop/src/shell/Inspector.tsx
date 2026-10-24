@@ -3,6 +3,7 @@ import { Panel, PanelBody, PanelHeader } from '@kingpost/ui';
 import { useViewer } from '../state/viewer';
 import { useModel } from '../state/model';
 import { useReview } from '../state/review';
+import { sheetLabel, useDrawings } from '../state/drawings';
 import { STAGE_COLORS, type Stage } from '../state/view';
 import { formatIsoDate, formatQuantity } from '../lib/format';
 import type { PropertyOut } from '../lib/ipc';
@@ -16,6 +17,8 @@ export function Inspector() {
   const status = useReview((s) => (summary ? s.statuses.get(summary.global_id) : undefined));
 
   const psets = useMemo(() => groupBySet(details?.properties ?? []), [details]);
+  const onDrawings = useDrawings((s) => s.elementLinks);
+  const openSheet = useDrawings((s) => s.openSheet);
 
   return (
     <Panel>
@@ -52,6 +55,22 @@ export function Inspector() {
               <Field label="Storey" value={summary?.storey} />
               <Field label="GlobalId" value={summary?.global_id} mono />
             </Section>
+            {onDrawings.length > 0 && (
+              <Section title="On drawings">
+                {onDrawings.map((l) => (
+                  <button
+                    key={l.link.id}
+                    type="button"
+                    className="flex w-full items-center justify-between gap-2 px-3 py-0.5 text-left text-xs hover:bg-surface-2"
+                    onClick={() => void openSheet(l.link.sheet_id, JSON.parse(l.link.region_json))}
+                    title={`${l.rel_path} rev ${l.revision_idx}, page ${l.page}`}
+                  >
+                    <span className="truncate">{sheetLabel(l)}</span>
+                    <span className="shrink-0 text-[10px] text-fg-muted">rev {l.revision_idx}</span>
+                  </button>
+                ))}
+              </Section>
+            )}
             {psets.map(([pset, properties]) => (
               <Section key={pset} title={pset}>
                 {properties.map((property) => (

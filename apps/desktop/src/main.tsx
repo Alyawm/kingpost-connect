@@ -4,6 +4,7 @@ import { TooltipProvider } from '@kingpost/ui';
 import { App } from './App';
 import { useAnalysis } from './state/analysis';
 import { useCompare } from './state/compare';
+import { useDrawings } from './state/drawings';
 import { useModel } from './state/model';
 import { useProject } from './state/project';
 import { useReview } from './state/review';
@@ -22,6 +23,7 @@ if (import.meta.env.DEV) {
     kingpost: {
       useAnalysis,
       useCompare,
+      useDrawings,
       useModel,
       useProject,
       useReview,

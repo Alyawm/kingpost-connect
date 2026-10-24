@@ -16,6 +16,7 @@ export function AppShell() {
   const leftOpen = useUi((s) => s.leftOpen);
   const rightOpen = useUi((s) => s.rightOpen);
   const bottomOpen = useUi((s) => s.bottomOpen);
+  const workspace = useUi((s) => s.workspace);
 
   return (
     <div className="flex h-full w-full flex-col bg-canvas text-fg">
@@ -29,7 +30,7 @@ export function AppShell() {
         <main className="flex min-w-0 flex-1 flex-col">
           <div className="relative min-h-0 flex-1">
             <Workspace />
-            <ViewportToolbar />
+            {workspace === 'model' && <ViewportToolbar />}
           </div>
           {bottomOpen && (
             <section className="h-44 shrink-0 border-t border-edge bg-surface" aria-label="Output">
