@@ -25,3 +25,4 @@ kp-project = { path = "../../../crates/kp-project" }
 kp-store = { path = "../../../crates/kp-store" }
 kp-ifc = { path = "../../../crates/kp-ifc" }
 kp-bcf = { path = "../../../crates/kp-bcf" }
+kp-diff = { path = "../../../crates/kp-diff" }

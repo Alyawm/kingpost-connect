@@ -418,3 +418,62 @@ export function bcfExport(path: string): Promise<number> {
 export function bcfImport(path: string): Promise<BcfImportSummary> {
   return invoke<BcfImportSummary>('bcf_import', { path });
 }
+
+// ---- Compare: revision diffs ----
+
+export type ChangeKind = 'added' | 'removed' | 'modified';
+
+export interface FieldChange {
+  field: string;
+  from: string | null;
+  to: string | null;
+}
+
+export interface DiffItem {
+  global_id: string;
+  change: ChangeKind;
+  detail: {
+    ifc_type: string;
+    name: string | null;
+    storey: string | null;
+    type_name: string | null;
+    changes: FieldChange[];
+  };
+}
+
+export interface DiffSummary {
+  from_elements: number;
+  to_elements: number;
+  added: number;
+  removed: number;
+  modified: number;
+  unchanged: number;
+  by_type: Record<string, [number, number, number]>;
+  elapsed_ms: number;
+}
+
+export interface DiffView {
+  id: number;
+  from_revision_id: number;
+  to_revision_id: number;
+  computed_at: string;
+  cached: boolean;
+  summary: DiffSummary;
+  items: DiffItem[];
+}
+
+export function diffRevisions(
+  fromRevisionId: number,
+  toRevisionId: number,
+  force = false,
+): Promise<DiffView> {
+  return invoke<DiffView>('diff_revisions', { fromRevisionId, toRevisionId, force });
+}
+
+export function diffExportCsv(
+  fromRevisionId: number,
+  toRevisionId: number,
+  path: string,
+): Promise<number> {
+  return invoke<number>('diff_export_csv', { fromRevisionId, toRevisionId, path });
+}

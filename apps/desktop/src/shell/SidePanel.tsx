@@ -4,13 +4,9 @@ import { ViewerPanel } from '../features/viewer/ViewerPanel';
 import { LabPanel } from '../features/lab/LabPanel';
 import { PlannedPanel } from '../features/planned/PlannedPanel';
 import { ReviewPanel } from '../features/review/ReviewPanel';
+import { ComparePanel } from '../features/compare/ComparePanel';
 
 const planned: Partial<Record<Section, { phase: string; summary: string }>> = {
-  compare: {
-    phase: 'Phase 3',
-    summary:
-      'Import a new revision and see every added, removed and modified member, section or property.',
-  },
   analysis: {
     phase: 'Phase 4',
     summary:
@@ -31,6 +27,8 @@ export function SidePanel() {
       return <ViewerPanel />;
     case 'review':
       return <ReviewPanel />;
+    case 'compare':
+      return <ComparePanel />;
     case 'lab':
       return <LabPanel />;
     default: {

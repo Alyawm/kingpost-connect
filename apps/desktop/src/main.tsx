@@ -2,6 +2,7 @@ import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
 import { TooltipProvider } from '@kingpost/ui';
 import { App } from './App';
+import { useCompare } from './state/compare';
 import { useModel } from './state/model';
 import { useProject } from './state/project';
 import { useReview } from './state/review';
@@ -17,7 +18,7 @@ if (!container) throw new Error('index.html is missing the #root element');
 // Development builds expose the stores for scripted checks and debugging from the console.
 if (import.meta.env.DEV) {
   Object.assign(window, {
-    kingpost: { useModel, useProject, useReview, useUi, useView, useViewer, useViews },
+    kingpost: { useCompare, useModel, useProject, useReview, useUi, useView, useViewer, useViews },
   });
 }
 

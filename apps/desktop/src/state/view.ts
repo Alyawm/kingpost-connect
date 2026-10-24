@@ -13,7 +13,7 @@ import { useModel } from './model';
 import { useViewer } from './viewer';
 
 export type SectionAxis = 'x' | 'y' | 'z';
-export type ColorBy = 'none' | 'type' | 'material' | 'storey' | 'status';
+export type ColorBy = 'none' | 'type' | 'material' | 'storey' | 'status' | 'change';
 export type Tool = 'select' | 'measure' | 'markup';
 
 export interface Section {
@@ -91,12 +91,26 @@ export const STAGE_COLORS: Record<Stage, string> = {
 };
 
 const NO_STATUS = '— not set —';
+const UNCHANGED = 'unchanged';
 const defaultSection: Section = { enabled: false, axis: 'y', position: 0, flip: false };
+
+export const CHANGE_COLORS: Record<string, string> = {
+  added: '#3ccf7a',
+  removed: '#ff6b6b',
+  modified: '#f5b941',
+  [UNCHANGED]: '#4a5260',
+};
 
 /** Supplies element statuses (GlobalId → stage) to the colouring without a store cycle. */
 let statusSource: () => ReadonlyMap<string, string> = () => new Map();
 export function setStatusSource(source: () => ReadonlyMap<string, string>): void {
   statusSource = source;
+}
+
+/** Supplies the current revision comparison (GlobalId → change) the same way. */
+let changeSource: () => ReadonlyMap<string, string> = () => new Map();
+export function setChangeSource(source: () => ReadonlyMap<string, string>): void {
+  changeSource = source;
 }
 
 export const useView = create<ViewState>((set, get) => ({
@@ -192,7 +206,10 @@ export const useView = create<ViewState>((set, get) => ({
 
   setColorBy: (mode) => {
     const { model, elements } = useModel.getState();
-    const legend = mode === 'none' ? [] : buildLegend(elements, mode, statusSource());
+    const legend =
+      mode === 'none'
+        ? []
+        : buildLegend(elements, mode, mode === 'change' ? changeSource() : statusSource());
     set({ colorBy: mode, legend });
     if (!model) return;
     if (mode === 'none') {
@@ -239,7 +256,8 @@ function vector(t: Triple): Vector3 {
 export function buildLegend(
   elements: ElementSummary[],
   mode: Exclude<ColorBy, 'none'>,
-  statuses: ReadonlyMap<string, string> = new Map(),
+  /** GlobalId → stage for `status`, GlobalId → change for `change`. */
+  lookup: ReadonlyMap<string, string> = new Map(),
 ): LegendEntry[] {
   const groups = new Map<string, number[]>();
   for (const element of elements) {
@@ -251,8 +269,21 @@ export function buildLegend(
           ? (element.material ?? '— no material —')
           : mode === 'storey'
             ? (element.storey ?? '— no storey —')
-            : (statuses.get(element.global_id) ?? NO_STATUS);
+            : mode === 'change'
+              ? (lookup.get(element.global_id) ?? UNCHANGED)
+              : (lookup.get(element.global_id) ?? NO_STATUS);
     groups.set(key, [...(groups.get(key) ?? []), element.express_id]);
+  }
+  if (mode === 'change') {
+    return ['added', 'modified', 'removed', UNCHANGED]
+      .filter((change) => groups.has(change))
+      .map((change) => ({
+        key: change,
+        label: change,
+        color: CHANGE_COLORS[change] ?? '#888888',
+        count: groups.get(change)?.length ?? 0,
+        ids: groups.get(change) ?? [],
+      }));
   }
   if (mode === 'status') {
     // Fixed order and colours: the pipeline reads left to right.
