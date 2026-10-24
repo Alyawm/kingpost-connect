@@ -217,6 +217,12 @@ Durations assume **2 developers** (one Rust/backend‑leaning, one React/3D‑le
 - Clash check between selection sets (hard clash via BVH + mesh intersection, clearance via distance), results grouped, issue creation, re‑run on new revision with status carry‑over.
 
 ### Phase 7 — Productisation (weeks 36–39) → **public v1.0**, push `v1.0.0`
+
+> Status 2026‑10‑24: tagged `v1.0.0`. Done: signed updater on request, offline licence
+> keys, local log bundle, geometry cache, welcome and getting‑started, settings and help,
+> localisation scaffold, user guide and release process. Open: Authenticode certificate
+> (client purchase), demo video and docs site, screen‑reader review of the viewers. See
+> `docs/devlog/2026-10-phase7-productisation.md` and ADR 009.
 - Installer, auto‑update, crash reporting (local log bundle, no third‑party telemetry unless the client approves), licensing (offline‑tolerant licence key), onboarding tour, docs site, demo video.
 - Performance pass, accessibility pass (keyboard, contrast), localisation scaffolding (en first).
 - Security: no network calls without consent; local data stays in the project folder.

@@ -12,7 +12,7 @@ Local-first: a project is a folder on disk; all data stays in it.
 
 ## Status
 
-**Coordination basics (v0.6.0).** Projects, IFC import with revisions, a viewer with
+**First release (v1.0.0).** Projects, IFC import with revisions, a viewer with
 element picking and multi-select, model tree, property inspector, section planes and plan
 views, colour by property or design status, measuring, markups, saved views; the review
 workflow: BCF-native issues with viewpoints, snapshots and comments, an element
@@ -22,8 +22,10 @@ analysis models from ETABS, SAP2000, SAF or the IFC structural view overlaid on 
 physical model, matched to it member by member with section and material differences
 reported; and PDF drawing sets with a sheet index, search, markups, regions linked to
 elements and saved views, and pixel comparison of two issues; and clash tests between
-element sets with statuses that survive re-runs and issues raised from clashes.
-Productisation (installer signing, updater, onboarding) is the next phase. See [CHANGELOG.md](CHANGELOG.md), the devlogs in
+element sets with statuses that survive re-runs and issues raised from clashes. The
+application updates on request from signed releases, takes an offline licence key, keeps
+its logs local and caches geometry for fast re-opening. Quantities and schedules
+(Phase 8) remain optional, at the client's decision. See [CHANGELOG.md](CHANGELOG.md), the devlogs in
 [docs/devlog/](docs/devlog/) and the roadmap in [docs/PLAN.md](docs/PLAN.md).
 
 ## Getting started
@@ -51,6 +53,8 @@ This repository is the record of how the program is built, for the developers wh
 - `docs/adr/` — architecture decision records: context, decision, alternatives, consequences.
 - `docs/devlog/` — one page per milestone: what was built, what was measured, what is next.
 - `CHANGELOG.md` — changes per release.
+- `docs/user-guide.md` — what the application does, for the people who use it.
+- `docs/release-process.md` — how a tag becomes an installer, and the keys kept outside the repository.
 - History is pushed at milestones (tagged `vX.Y.Z`), with commits curated per feature and written as Conventional Commits.
 
 ## Licence

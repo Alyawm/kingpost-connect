@@ -3,6 +3,24 @@
 All notable changes to KingPost Connect. The format follows Keep a Changelog; versions
 follow semantic versioning. Milestone tags match the headings below.
 
+## [1.0.0] — 2026-10-24 — First release
+
+The application is ready to install, update and support.
+
+### Added
+- Updates: checked only on request or with the opt-in start-up setting, signed artifacts
+  from the latest published GitHub Release, installed only after confirmation.
+- Licence keys checked offline (`kp-licence`): Ed25519-signed, installed from Settings;
+  without one the application runs as an evaluation copy with every feature.
+- Diagnostics: a daily log file in the project's data folder and a zip bundle written on
+  request; nothing is sent anywhere.
+- Geometry cache: a loaded revision's meshes are kept in the project's data folder and
+  reused on the next load.
+- Welcome screen with recent projects, a getting-started checklist, a Settings dialog
+  (name, theme, updates, licence, cache, diagnostics) and a Help dialog with the shortcuts.
+- Localisation scaffold with an English dictionary.
+- Documentation: user guide and release process.
+
 ## [0.6.0] — 2026-10-24 — Coordination basics
 
 Clash checks between selection sets, tracked across runs and revisions.

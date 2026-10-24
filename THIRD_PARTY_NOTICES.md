@@ -30,6 +30,8 @@ Add a row when introducing a new dependency.
 | zip | MIT | BCF archives |
 | calamine | MIT | Reading SAF workbooks (.xlsx) |
 | pdf.js (`pdfjs-dist`) | Apache-2.0 | Rendering and reading PDF drawing sheets |
+| tauri-plugin-updater, tauri-plugin-process (`@tauri-apps/plugin-updater`, `@tauri-apps/plugin-process`) | MIT / Apache-2.0 | Updates on request and restart after install |
+| ed25519-dalek, rand_core | BSD-3-Clause / MIT / Apache-2.0 | Licence key signatures |
 
 ## Development only
 

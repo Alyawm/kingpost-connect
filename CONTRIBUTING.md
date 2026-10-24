@@ -68,7 +68,8 @@ The repository exists so that the next developer can understand how the program 
 - **Milestones** get a devlog page in `docs/devlog/`, a `CHANGELOG.md` entry, and a tag.
 - **GitHub is updated at milestones only.** Day-to-day commits stay local; before a
   milestone push the history is tidied into coherent, buildable commits per feature.
-  Pushing a `v*` tag runs CI and builds the installers into a draft release.
+  Pushing a `v*` tag runs CI and builds the installers into a draft release; the keys and
+  steps are in `docs/release-process.md`.
 
 ## Checking the real desktop window from a script
 
