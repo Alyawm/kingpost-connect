@@ -3,10 +3,12 @@ import {
   Viewport,
   createSampleFrame,
   type PickResult,
+  type PointPick,
   type ViewportHandle,
 } from '@kingpost/viewer';
 import { useViewer } from '../state/viewer';
 import { useModel } from '../state/model';
+import { useView } from '../state/view';
 
 /**
  * The 3D viewport. Mounted once for the life of the window so the WebGL context and
@@ -35,5 +37,9 @@ export function Workspace() {
     [setSelection],
   );
 
-  return <Viewport onReady={onReady} onSelect={onSelect} />;
+  const onPickPoint = useCallback((pick: PointPick) => {
+    useView.getState().pickPoint(pick);
+  }, []);
+
+  return <Viewport onReady={onReady} onSelect={onSelect} onPickPoint={onPickPoint} />;
 }

@@ -1,6 +1,7 @@
 import { useEffect } from 'react';
 import { listCommands } from './commands';
 import { useUi } from '../state/ui';
+import { useView } from '../state/view';
 
 function isTyping(target: EventTarget | null): boolean {
   if (!(target instanceof HTMLElement)) return false;
@@ -20,6 +21,11 @@ export function useShortcuts(): void {
         return;
       }
       if (isTyping(event.target) || useUi.getState().paletteOpen) return;
+
+      if (event.key === 'Escape' && useView.getState().tool !== 'select') {
+        useView.getState().setTool('select');
+        return;
+      }
 
       const pressed = [ctrl && 'Ctrl', event.altKey && 'Alt', event.shiftKey && 'Shift', key]
         .filter(Boolean)

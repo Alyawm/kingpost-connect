@@ -5,6 +5,7 @@ import { Button, IconButton, Panel, PanelBody, PanelHeader } from '@kingpost/ui'
 import { useViewer } from '../../state/viewer';
 import { useModel } from '../../state/model';
 import { ModelTree } from './ModelTree';
+import { ViewTools } from './ViewTools';
 
 export function ViewerPanel() {
   const handle = useViewer((s) => s.handle);
@@ -52,11 +53,14 @@ export function ViewerPanel() {
               />
             </label>
           </div>
-          <PanelBody className="p-0 py-1">
+          <PanelBody className="p-0 pb-1">
             {loading ? (
               <p className="px-3 py-2 text-xs text-fg-muted">Loading…</p>
             ) : (
-              <ModelTree filter={filter} />
+              <>
+                <ViewTools />
+                <ModelTree filter={filter} />
+              </>
             )}
           </PanelBody>
         </>

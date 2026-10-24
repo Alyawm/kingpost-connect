@@ -2,6 +2,7 @@ import { useUi } from '../state/ui';
 import { Rail } from './Rail';
 import { SidePanel } from './SidePanel';
 import { Workspace } from './Workspace';
+import { ViewportToolbar } from './ViewportToolbar';
 import { Inspector } from './Inspector';
 import { OutputPanel } from './OutputPanel';
 import { StatusBar } from './StatusBar';
@@ -28,6 +29,7 @@ export function AppShell() {
         <main className="flex min-w-0 flex-1 flex-col">
           <div className="relative min-h-0 flex-1">
             <Workspace />
+            <ViewportToolbar />
           </div>
           {bottomOpen && (
             <section className="h-44 shrink-0 border-t border-edge bg-surface" aria-label="Output">
