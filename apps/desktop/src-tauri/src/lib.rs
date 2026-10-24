@@ -3,7 +3,7 @@
 
 mod commands;
 
-use commands::{compare, model, project, review, views};
+use commands::{analysis, compare, model, project, review, views};
 
 pub fn run() {
     tauri::Builder::default()
@@ -44,6 +44,12 @@ pub fn run() {
             review::bcf_import,
             compare::diff_revisions,
             compare::diff_export_csv,
+            analysis::analysis_import,
+            analysis::analysis_models,
+            analysis::analysis_model,
+            analysis::analysis_match,
+            analysis::analysis_link_set,
+            analysis::analysis_link_override,
         ])
         .run(tauri::generate_context!())
         .expect("failed to start KingPost Connect");

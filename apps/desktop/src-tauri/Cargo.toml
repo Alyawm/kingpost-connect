@@ -26,3 +26,5 @@ kp-store = { path = "../../../crates/kp-store" }
 kp-ifc = { path = "../../../crates/kp-ifc" }
 kp-bcf = { path = "../../../crates/kp-bcf" }
 kp-diff = { path = "../../../crates/kp-diff" }
+kp-analysis = { path = "../../../crates/kp-analysis" }
+sha2.workspace = true

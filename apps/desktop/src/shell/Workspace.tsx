@@ -10,6 +10,7 @@ import {
 import { useViewer } from '../state/viewer';
 import { useModel } from '../state/model';
 import { useView } from '../state/view';
+import { useAnalysis } from '../state/analysis';
 
 /**
  * The 3D viewport. Mounted once for the life of the window so the WebGL context and
@@ -33,6 +34,10 @@ export function Workspace() {
   const onSelect = useCallback(
     (hit: PickResult | null, modifiers: PickModifiers) => {
       setSelection(hit);
+      if (hit?.member) {
+        useAnalysis.getState().selectMember(hit.member);
+        return;
+      }
       useModel.getState().onPick(hit, modifiers);
     },
     [setSelection],

@@ -13,7 +13,7 @@ import { useModel } from './model';
 import { useViewer } from './viewer';
 
 export type SectionAxis = 'x' | 'y' | 'z';
-export type ColorBy = 'none' | 'type' | 'material' | 'storey' | 'status' | 'change';
+export type ColorBy = 'none' | 'type' | 'material' | 'storey' | 'status' | 'change' | 'link';
 export type Tool = 'select' | 'measure' | 'markup';
 
 export interface Section {
@@ -113,6 +113,21 @@ export function setChangeSource(source: () => ReadonlyMap<string, string>): void
   changeSource = source;
 }
 
+const NOT_COMPARED = 'not compared';
+export const LINK_COLORS: Record<string, string> = {
+  linked: '#3ccf7a',
+  'section differs': '#f5b941',
+  'material differs': '#c084fc',
+  unmatched: '#ff6b6b',
+  [NOT_COMPARED]: '#4a5260',
+};
+
+/** Supplies the physical ↔ analytical link status (GlobalId → status) the same way. */
+let linkSource: () => ReadonlyMap<string, string> = () => new Map();
+export function setLinkSource(source: () => ReadonlyMap<string, string>): void {
+  linkSource = source;
+}
+
 export const useView = create<ViewState>((set, get) => ({
   tool: 'select',
   section: defaultSection,
@@ -209,7 +224,11 @@ export const useView = create<ViewState>((set, get) => ({
     const legend =
       mode === 'none'
         ? []
-        : buildLegend(elements, mode, mode === 'change' ? changeSource() : statusSource());
+        : buildLegend(
+            elements,
+            mode,
+            mode === 'change' ? changeSource() : mode === 'link' ? linkSource() : statusSource(),
+          );
     set({ colorBy: mode, legend });
     if (!model) return;
     if (mode === 'none') {
@@ -271,7 +290,9 @@ export function buildLegend(
             ? (element.storey ?? '— no storey —')
             : mode === 'change'
               ? (lookup.get(element.global_id) ?? UNCHANGED)
-              : (lookup.get(element.global_id) ?? NO_STATUS);
+              : mode === 'link'
+                ? (lookup.get(element.global_id) ?? NOT_COMPARED)
+                : (lookup.get(element.global_id) ?? NO_STATUS);
     groups.set(key, [...(groups.get(key) ?? []), element.express_id]);
   }
   if (mode === 'change') {
@@ -283,6 +304,17 @@ export function buildLegend(
         color: CHANGE_COLORS[change] ?? '#888888',
         count: groups.get(change)?.length ?? 0,
         ids: groups.get(change) ?? [],
+      }));
+  }
+  if (mode === 'link') {
+    return ['linked', 'section differs', 'material differs', 'unmatched', NOT_COMPARED]
+      .filter((status) => groups.has(status))
+      .map((status) => ({
+        key: status,
+        label: status,
+        color: LINK_COLORS[status] ?? '#888888',
+        count: groups.get(status)?.length ?? 0,
+        ids: groups.get(status) ?? [],
       }));
   }
   if (mode === 'status') {

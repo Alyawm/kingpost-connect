@@ -477,3 +477,260 @@ export function diffExportCsv(
 ): Promise<number> {
   return invoke<number>('diff_export_csv', { fromRevisionId, toRevisionId, path });
 }
+
+// ---- Analysis: SAF / ETABS / SAP2000 models, the IFC structural view, and linking ----
+
+export type MemberKind = 'beam' | 'column' | 'brace' | 'other';
+
+export interface AnalysisUnits {
+  length: string;
+  force: string;
+}
+export interface AnalysisNode {
+  name: string;
+  x: number;
+  y: number;
+  z: number;
+}
+export interface AnalysisMember {
+  uid: string;
+  name: string;
+  kind: MemberKind;
+  start: string;
+  end: string;
+  section: string | null;
+  material: string | null;
+  storey: string | null;
+}
+export interface AnalysisSurface {
+  uid: string;
+  name: string;
+  kind: string;
+  nodes: string[];
+  section: string | null;
+  material: string | null;
+  storey: string | null;
+}
+export interface AnalysisMaterial {
+  name: string;
+  kind: string;
+  grade: string | null;
+  e_modulus: number | null;
+  unit_weight: number | null;
+}
+export interface AnalysisSection {
+  name: string;
+  material: string | null;
+  shape: string | null;
+  dimensions: { name: string; value: number }[];
+  thickness: number | null;
+}
+export interface AnalysisSupport {
+  node: string;
+  fixed: boolean[];
+}
+export interface AnalysisLoadCase {
+  name: string;
+  kind: string;
+}
+export interface AnalysisCombination {
+  name: string;
+  kind: string;
+  factors: { case: string; factor: number }[];
+}
+export interface AnalysisPointLoad {
+  node: string;
+  case: string;
+  force: [number, number, number];
+  moment: [number, number, number];
+}
+export interface AnalysisLineLoad {
+  member: string;
+  case: string;
+  direction: string;
+  start: number;
+  end: number;
+  from: number;
+  to: number;
+}
+export interface AnalysisSurfaceLoad {
+  surface: string;
+  case: string;
+  direction: string;
+  value: number;
+}
+export interface MemberForce {
+  member: string;
+  case: string;
+  station: number;
+  n: number;
+  vy: number;
+  vz: number;
+  t: number;
+  my: number;
+  mz: number;
+}
+export interface AnalysisModel {
+  source: string;
+  program: string | null;
+  units: AnalysisUnits;
+  storeys: { name: string; elevation: number }[];
+  nodes: AnalysisNode[];
+  members: AnalysisMember[];
+  surfaces: AnalysisSurface[];
+  materials: AnalysisMaterial[];
+  sections: AnalysisSection[];
+  supports: AnalysisSupport[];
+  load_cases: AnalysisLoadCase[];
+  combinations: AnalysisCombination[];
+  point_loads: AnalysisPointLoad[];
+  line_loads: AnalysisLineLoad[];
+  surface_loads: AnalysisSurfaceLoad[];
+  results: MemberForce[];
+  notes: string[];
+}
+
+export interface AnalysisSummary {
+  source: string;
+  program: string | null;
+  length_unit: string;
+  force_unit: string;
+  nodes: number;
+  members: number;
+  surfaces: number;
+  supports: number;
+  load_cases: number;
+  combinations: number;
+  loads: number;
+  results: number;
+  notes: string[];
+}
+
+export interface AnalysisImportSummary {
+  file_id: number;
+  revision_id: number;
+  revision_index: number;
+  summary: AnalysisSummary;
+  total_ms: number;
+}
+
+export interface AnalysisModelSummary {
+  revision_id: number;
+  file_id: number;
+  rel_path: string;
+  revision_idx: number;
+  imported_at: string;
+  source: string;
+  program: string | null;
+  length_unit: string;
+  force_unit: string;
+  node_count: number;
+  member_count: number;
+  surface_count: number;
+  load_count: number;
+  result_count: number;
+}
+
+export interface PhysicalAxis {
+  global_id: string;
+  ifc_type: string;
+  name: string | null;
+  tag: string | null;
+  type_name: string | null;
+  material: string | null;
+  storey: string | null;
+  start: Triple;
+  end: Triple;
+}
+
+export interface MatchSettings {
+  tolerance: number;
+  offset: Triple;
+  same_kind: boolean;
+}
+
+export type LinkMethod = 'name' | 'position' | 'manual';
+
+export interface Link {
+  global_id: string;
+  member_uid: string;
+  method: LinkMethod;
+  distance: number;
+  physical_section: string | null;
+  analysis_section: string | null;
+  section_ok: boolean | null;
+  physical_material: string | null;
+  analysis_material: string | null;
+  material_ok: boolean | null;
+}
+
+export interface LinkReport {
+  links: Link[];
+  unmatched_physical: string[];
+  unmatched_members: string[];
+  physical_count: number;
+  member_count: number;
+  section_mismatches: number;
+  material_mismatches: number;
+}
+
+export interface LinkSetView {
+  computed_at: string;
+  settings: MatchSettings;
+  report: LinkReport;
+}
+
+export function analysisImport(relPath: string): Promise<AnalysisImportSummary> {
+  return invoke<AnalysisImportSummary>('analysis_import', { relPath });
+}
+
+export function analysisModels(): Promise<AnalysisModelSummary[]> {
+  if (!isTauri()) return Promise.resolve([]);
+  return invoke<AnalysisModelSummary[]>('analysis_models');
+}
+
+export async function analysisModel(revisionId: number): Promise<AnalysisModel> {
+  const json = await invoke<string>('analysis_model', { revisionId });
+  return JSON.parse(json) as AnalysisModel;
+}
+
+export function analysisMatch(
+  physicalRevisionId: number,
+  analysisRevisionId: number,
+  axes: PhysicalAxis[],
+  settings: MatchSettings,
+): Promise<LinkSetView> {
+  return invoke<LinkSetView>('analysis_match', {
+    physicalRevisionId,
+    analysisRevisionId,
+    axes,
+    settings,
+  });
+}
+
+export function analysisLinkSet(
+  physicalRevisionId: number,
+  analysisRevisionId: number,
+): Promise<LinkSetView | null> {
+  if (!isTauri()) return Promise.resolve(null);
+  return invoke<LinkSetView | null>('analysis_link_set', {
+    physicalRevisionId,
+    analysisRevisionId,
+  });
+}
+
+export function analysisLinkOverride(
+  physicalRevisionId: number,
+  analysisRevisionId: number,
+  globalId: string,
+  memberUid: string | null,
+  axis: PhysicalAxis | null,
+): Promise<LinkReport> {
+  return invoke<LinkReport>('analysis_link_override', {
+    physicalRevisionId,
+    analysisRevisionId,
+    globalId,
+    memberUid,
+    axis,
+  });
+}

@@ -50,7 +50,7 @@ fn kind_of(path: &Path) -> Option<&'static str> {
 }
 
 /// Resolves a project-relative path and refuses anything that escapes the root.
-fn resolve_in_root(root: &Path, rel_path: &str) -> Result<PathBuf, String> {
+pub(crate) fn resolve_in_root(root: &Path, rel_path: &str) -> Result<PathBuf, String> {
     let rel = Path::new(rel_path);
     if rel.is_absolute()
         || rel
@@ -160,8 +160,17 @@ pub async fn import_ifc(
     );
     let result = tauri::async_runtime::spawn_blocking(move || {
         state.with_project(|project| {
-            resolve_in_root(project.root(), &rel_path)?;
-            kp_ifc::import_file(project.store(), project.root(), &rel_path).map_err(describe)
+            let path = resolve_in_root(project.root(), &rel_path)?;
+            let summary = kp_ifc::import_file(project.store(), project.root(), &rel_path)
+                .map_err(describe)?;
+            // A file that carries a structural analysis view is stored as an analysis
+            // model of the same revision, so it can be overlaid and matched.
+            if let Ok(bytes) = fs::read(&path)
+                && let Ok(Some(model)) = kp_analysis::from_ifc_bytes(&bytes)
+            {
+                super::analysis::save_model(project.store(), summary.revision_id, &model)?;
+            }
+            Ok(summary)
         })
     })
     .await
