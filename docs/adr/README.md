@@ -16,6 +16,7 @@ Read them in order to understand why the code looks the way it does.
 | [005](005-revision-comparison.md) | Revisions compared by GlobalId on stored semantics, not geometry | Accepted |
 | [006](006-analysis-models.md) | One analysis model shape for every source; linking by axis, not by geometry | Accepted |
 | [007](007-drawings.md) | Sheets read and compared in the interface with pdf.js; links follow sheet numbers | Accepted |
+| [008](008-clash-detection.md) | Clashes found on the loaded meshes in the interface and tracked by element pair | Accepted |
 
 ## Template
 

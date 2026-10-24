@@ -1819,7 +1819,7 @@ dependencies = [
 
 [[package]]
 name = "kingpost-connect"
-version = "0.5.0"
+version = "0.6.0"
 dependencies = [
  "base64 0.22.1",
  "kp-analysis",
@@ -1840,7 +1840,7 @@ dependencies = [
 
 [[package]]
 name = "kp-analysis"
-version = "0.5.0"
+version = "0.6.0"
 dependencies = [
  "calamine",
  "kp-ifc",
@@ -1852,7 +1852,7 @@ dependencies = [
 
 [[package]]
 name = "kp-bcf"
-version = "0.5.0"
+version = "0.6.0"
 dependencies = [
  "quick-xml 0.37.5",
  "tempfile",
@@ -1862,7 +1862,7 @@ dependencies = [
 
 [[package]]
 name = "kp-diff"
-version = "0.5.0"
+version = "0.6.0"
 dependencies = [
  "kp-store",
  "serde",
@@ -1872,7 +1872,7 @@ dependencies = [
 
 [[package]]
 name = "kp-ifc"
-version = "0.5.0"
+version = "0.6.0"
 dependencies = [
  "kp-store",
  "serde",
@@ -1884,7 +1884,7 @@ dependencies = [
 
 [[package]]
 name = "kp-project"
-version = "0.5.0"
+version = "0.6.0"
 dependencies = [
  "kp-store",
  "serde",
@@ -1897,7 +1897,7 @@ dependencies = [
 
 [[package]]
 name = "kp-store"
-version = "0.5.0"
+version = "0.6.0"
 dependencies = [
  "rusqlite",
  "serde",

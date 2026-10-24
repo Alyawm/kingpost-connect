@@ -208,6 +208,12 @@ Durations assume **2 developers** (one Rust/backend‑leaning, one React/3D‑le
 - **Done when:** a GA drawing set links to the model and sheet compare highlights revised areas.
 
 ### Phase 6 — Coordination basics (weeks 33–35) → push `v0.6.0`
+
+> Status 2026‑10‑24: tagged `v0.6.0`. Done: hard and clearance clash tests between two
+> element sets on the loaded meshes, results grouped by type with statuses that survive
+> re‑runs and revisions, issues from clashes. Open: engine in a worker, stored set rules,
+> penetration depth, CSV/BCF export of clashes. See
+> `docs/devlog/2026-10-phase6-coordination.md` and ADR 008.
 - Clash check between selection sets (hard clash via BVH + mesh intersection, clearance via distance), results grouped, issue creation, re‑run on new revision with status carry‑over.
 
 ### Phase 7 — Productisation (weeks 36–39) → **public v1.0**, push `v1.0.0`

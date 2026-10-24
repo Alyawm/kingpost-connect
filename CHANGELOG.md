@@ -3,6 +3,22 @@
 All notable changes to KingPost Connect. The format follows Keep a Changelog; versions
 follow semantic versioning. Milestone tags match the headings below.
 
+## [0.6.0] — 2026-10-24 — Coordination basics
+
+Clash checks between selection sets, tracked across runs and revisions.
+
+### Added
+- Clash engine in the viewer: per-element triangle trees, hard contact (intersecting or
+  touching triangles) and clearance (closest distance under a gap), chunked and
+  cancellable, with progress.
+- Store: migration 006 adds clash tests (two element sets and a rule) and clashes keyed by
+  element pair with status, note and first/last seen; a run reopens what is back and
+  resolves what is gone.
+- Coordination section: tests from the current selection (set A, set B, or everything
+  else), hard or clearance in millimetres, run on the loaded revision with progress and
+  cancel, results filtered by status and grouped by the pair's IFC types, focus with a
+  point marker, inline status changes, and an issue raised from a clash.
+
 ## [0.5.0] — 2026-10-24 — Drawings
 
 PDF drawing sets next to the model, linked both ways, and compared issue by issue.
