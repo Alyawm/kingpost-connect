@@ -2,6 +2,7 @@ import { create } from 'zustand';
 import {
   importIfc,
   isTauri,
+  onShellEvent,
   projectClose,
   projectCreate,
   projectCurrent,
@@ -27,6 +28,8 @@ interface ProjectState {
   openFolder(): Promise<void>;
   close(): Promise<void>;
   importFile(relPath: string): Promise<ImportSummary | null>;
+  /** Refreshes the file list when the shell reports changes in the project folder. */
+  watchFiles(): Promise<() => void>;
 }
 
 export const useProject = create<ProjectState>((set, get) => ({
@@ -88,6 +91,18 @@ export const useProject = create<ProjectState>((set, get) => ({
     if (isTauri()) await projectClose();
     set({ current: null, files: [] });
     log.info('Project closed');
+  },
+
+  watchFiles: async () => {
+    let timer: ReturnType<typeof setTimeout> | null = null;
+    const unlisten = await onShellEvent('files:changed', () => {
+      if (timer) clearTimeout(timer);
+      timer = setTimeout(() => void get().refreshFiles(), 300);
+    });
+    return () => {
+      if (timer) clearTimeout(timer);
+      unlisten();
+    };
   },
 
   importFile: async (relPath) => {

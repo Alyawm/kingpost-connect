@@ -6,6 +6,7 @@ import { useViewer } from '../../state/viewer';
 import { useModel } from '../../state/model';
 import { ModelTree } from './ModelTree';
 import { ViewTools } from './ViewTools';
+import { ViewsPanel } from './ViewsPanel';
 
 export function ViewerPanel() {
   const handle = useViewer((s) => s.handle);
@@ -59,6 +60,7 @@ export function ViewerPanel() {
             ) : (
               <>
                 <ViewTools />
+                <ViewsPanel />
                 <ModelTree filter={filter} />
               </>
             )}

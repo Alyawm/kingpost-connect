@@ -9,6 +9,13 @@ import { invoke, isTauri } from '@tauri-apps/api/core';
 
 export { isTauri };
 
+/** Subscribes to a shell event; resolves to the unsubscribe function. No-op in a browser. */
+export async function onShellEvent(name: string, handler: () => void): Promise<() => void> {
+  if (!isTauri()) return () => {};
+  const { listen } = await import('@tauri-apps/api/event');
+  return listen(name, handler);
+}
+
 export interface AppInfo {
   name: string;
   version: string;
@@ -162,4 +169,44 @@ export function searchElements(
   limit = 200,
 ): Promise<ElementSummary[]> {
   return invoke<ElementSummary[]>('search_elements', { revisionId, query, limit });
+}
+
+export interface SavedView {
+  id: string;
+  name: string;
+  camera_json: string;
+  visibility_json: string;
+  section_planes_json: string;
+  /** JPEG data URL, when a thumbnail was stored. */
+  thumbnail: string | null;
+  created_at: string;
+}
+
+export function viewsList(): Promise<SavedView[]> {
+  if (!isTauri()) return Promise.resolve([]);
+  return invoke<SavedView[]>('views_list');
+}
+
+export function viewSave(
+  name: string,
+  cameraJson: string,
+  visibilityJson: string,
+  sectionPlanesJson: string,
+  thumbnail: string | null,
+): Promise<SavedView> {
+  return invoke<SavedView>('view_save', {
+    name,
+    cameraJson,
+    visibilityJson,
+    sectionPlanesJson,
+    thumbnail,
+  });
+}
+
+export function viewRename(id: string, name: string): Promise<boolean> {
+  return invoke<boolean>('view_rename', { id, name });
+}
+
+export function viewDelete(id: string): Promise<boolean> {
+  return invoke<boolean>('view_delete', { id });
 }

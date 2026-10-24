@@ -10,10 +10,13 @@ use kp_project::Project;
 
 pub mod model;
 pub mod project;
+pub mod views;
+pub mod watcher;
 
 #[derive(Default, Clone)]
 pub struct AppState {
     project: Arc<Mutex<Option<Project>>>,
+    watcher: Arc<Mutex<Option<watcher::FolderWatcher>>>,
 }
 
 impl AppState {
@@ -55,6 +58,13 @@ impl AppState {
             .as_ref()
             .ok_or_else(|| "no project is open".to_owned())?;
         f(project)
+    }
+
+    /// Replaces the folder watcher; `None` stops watching.
+    fn set_watcher(&self, watcher: Option<watcher::FolderWatcher>) {
+        if let Ok(mut guard) = self.watcher.lock() {
+            *guard = watcher;
+        }
     }
 }
 

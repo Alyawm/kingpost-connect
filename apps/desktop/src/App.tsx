@@ -20,6 +20,22 @@ export function App() {
     void refreshProject();
   }, [loadInfo, refreshProject]);
 
+  useEffect(() => {
+    let stop: (() => void) | null = null;
+    let cancelled = false;
+    void useProject
+      .getState()
+      .watchFiles()
+      .then((unsubscribe) => {
+        if (cancelled) unsubscribe();
+        else stop = unsubscribe;
+      });
+    return () => {
+      cancelled = true;
+      stop?.();
+    };
+  }, []);
+
   useShortcuts();
 
   return <AppShell />;
