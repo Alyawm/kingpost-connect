@@ -1,0 +1,44 @@
+@import 'tailwindcss';
+@import '@kingpost/ui/tokens.css';
+
+/* Components in workspace packages use Tailwind classes too; include their sources. */
+@source '../../../packages/ui/src';
+@source '../../../packages/viewer/src';
+
+html,
+body,
+#root {
+  height: 100%;
+  margin: 0;
+  overflow: hidden;
+}
+
+body {
+  background: var(--kp-canvas);
+  color: var(--kp-fg);
+  font-family: var(--font-sans);
+  font-size: 13px;
+  -webkit-font-smoothing: antialiased;
+  user-select: none;
+}
+
+/* Desktop feel: no text cursor on chrome, but editable fields keep selection. */
+input,
+textarea,
+[contenteditable] {
+  user-select: text;
+}
+
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+::-webkit-scrollbar-thumb {
+  background: var(--kp-surface-3);
+  border: 2px solid transparent;
+  background-clip: padding-box;
+  border-radius: 6px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
