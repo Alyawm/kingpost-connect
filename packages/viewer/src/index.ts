@@ -17,6 +17,12 @@ export { loadIfcToGroup, type IfcLoadStats, type IfcLoadResult } from './ifc/loa
 export { IfcModel, type ElementRange, type MeshBucket } from './ifc/model';
 export { IfcFrame, type Triple } from './ifc/coordinates';
 export {
+  AnalysisLayer,
+  MEMBER_KIND_COLORS,
+  type AnalysisDrawSource,
+  type AnalysisVisibility,
+} from './analysis';
+export {
   createLineObject,
   createMeasurementObject,
   formatDistance,

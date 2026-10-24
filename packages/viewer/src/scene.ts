@@ -1,11 +1,14 @@
 import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+import type { AnalysisLayer } from './analysis';
 
 /** What the viewport reports when the user clicks an object. */
 export interface PickResult {
   name: string;
   type: string;
   expressId?: number;
+  /** Set when an analysis member was hit instead of a mesh. */
+  member?: string;
 }
 
 export type ViewDirection = 'iso' | 'top' | 'front' | 'back' | 'left' | 'right';
@@ -46,6 +49,8 @@ export interface ViewportHandle {
   /** Overlay objects (measurements, markers) live above the content and survive `clear`. */
   addOverlay(object: THREE.Object3D): void;
   clearOverlay(): void;
+  /** Shows an analytical model over (or instead of) the loaded geometry; null removes it. */
+  setAnalysisLayer(layer: AnalysisLayer | null): void;
   setPickMode(mode: PickMode): void;
   getCamera(): CameraState;
   setCamera(state: CameraState): void;
@@ -96,6 +101,7 @@ export class SceneController implements ViewportHandle {
   readonly content = new THREE.Group();
   /** Measurements and other annotations; not part of the model's bounds. */
   readonly overlay = new THREE.Group();
+  private analysis: AnalysisLayer | null = null;
 
   onPick: ((hit: PickResult | null, modifiers: PickModifiers) => void) | null = null;
   onPickPoint: ((pick: PointPick) => void) | null = null;
@@ -179,6 +185,16 @@ export class SceneController implements ViewportHandle {
     this.requestRender();
   }
 
+  setAnalysisLayer(layer: AnalysisLayer | null): void {
+    if (this.analysis) {
+      this.scene.remove(this.analysis.group);
+      this.analysis.dispose();
+    }
+    this.analysis = layer;
+    if (layer) this.scene.add(layer.group);
+    this.requestRender();
+  }
+
   clearOverlay(): void {
     for (const child of [...this.overlay.children]) {
       this.overlay.remove(child);
@@ -233,6 +249,7 @@ export class SceneController implements ViewportHandle {
   /** Bounds of everything loaded; a default box when the scene is empty. */
   contentBounds(): THREE.Box3 {
     const box = new THREE.Box3().setFromObject(this.content);
+    if (this.analysis) box.union(new THREE.Box3().setFromObject(this.analysis.group));
     if (box.isEmpty()) {
       box.set(new THREE.Vector3(-8, 0, -8), new THREE.Vector3(8, 6, 8));
     }
@@ -370,7 +387,21 @@ export class SceneController implements ViewportHandle {
     this.raycaster.setFromCamera(pointer, this.camera);
     const hit = this.raycaster
       .intersectObjects(this.content.children, true)
-      .find((h) => (h.object as THREE.Mesh).isMesh && h.object.visible);
+      .find((h) => (h.object as THREE.Mesh).isMesh && visibleInTree(h.object));
+
+    // Analysis members are lines inside the solids they model; a line hit that is not
+    // clearly behind the mesh hit wins, otherwise members could never be picked.
+    if (this.pickMode === 'select' && this.analysis) {
+      const member = this.analysis.pick(this.raycaster);
+      if (member && (!hit || member.distance <= hit.distance + 0.5)) {
+        this.select(null);
+        this.onPick?.(
+          { name: member.uid, type: 'AnalysisMember', member: member.uid },
+          { ctrl: event.ctrlKey || event.metaKey, shift: event.shiftKey },
+        );
+        return;
+      }
+    }
 
     if (this.pickMode === 'point') {
       if (!hit) return;
@@ -404,6 +435,14 @@ export class SceneController implements ViewportHandle {
     this.select(mesh);
     this.onPick?.(pickResultOf(mesh), modifiers);
   };
+}
+
+/** The raycaster ignores a hidden ancestor, so visibility is checked up the tree. */
+function visibleInTree(object: THREE.Object3D): boolean {
+  for (let o: THREE.Object3D | null = object; o; o = o.parent) {
+    if (!o.visible) return false;
+  }
+  return true;
 }
 
 function pickResultOf(mesh: THREE.Mesh): PickResult {
