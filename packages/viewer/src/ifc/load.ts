@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import type { IfcAPI } from 'web-ifc';
+import { IfcFrame } from './coordinates';
 import { colorKey, toBufferGeometry } from './geometry';
 import { IfcModel, solidVertexColors, type ElementRange, type MeshBucket } from './model';
 import { IFC_WASM_DIR } from './wasm';
@@ -21,6 +22,8 @@ export interface IfcLoadStats {
 export interface IfcLoadResult {
   model: IfcModel;
   stats: IfcLoadStats;
+  /** Maps viewer space to IFC world coordinates (see `IfcFrame`). */
+  frame: IfcFrame;
 }
 
 let apiPromise: Promise<{ api: IfcAPI; initMs: number }> | null = null;
@@ -68,8 +71,10 @@ export async function loadIfcToGroup(data: Uint8Array): Promise<IfcLoadResult> {
   const byMaterial = new Map<string, Bucket>();
   let meshes = 0;
   let triangles = 0;
+  let coordination: number[] | null = null;
 
   try {
+    coordination = api.GetCoordinationMatrix(modelID);
     api.StreamAllMeshes(modelID, (flatMesh) => {
       meshes++;
       const placed = flatMesh.geometries;
@@ -163,6 +168,7 @@ export async function loadIfcToGroup(data: Uint8Array): Promise<IfcLoadResult> {
 
   return {
     model: new IfcModel(group, buckets),
+    frame: new IfcFrame(coordination),
     stats: {
       schema,
       meshes,

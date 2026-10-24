@@ -47,6 +47,21 @@ export function createMeasurementObject(m: Measurement): THREE.Group {
   return group;
 }
 
+/** A plain annotation line drawn on top of the model (markups, imported BCF lines). */
+export function createLineObject(
+  a: THREE.Vector3,
+  b: THREE.Vector3,
+  color = LINE_COLOR,
+): THREE.Line {
+  const line = new THREE.Line(
+    new THREE.BufferGeometry().setFromPoints([a, b]),
+    new THREE.LineBasicMaterial({ color, depthTest: false, transparent: true, linewidth: 2 }),
+  );
+  line.renderOrder = 10;
+  line.name = 'markup';
+  return line;
+}
+
 export function formatDistance(metres: number): string {
   if (metres < 1) return `${Math.round(metres * 1000)} mm`;
   return `${metres.toFixed(metres < 10 ? 3 : 2)} m`;

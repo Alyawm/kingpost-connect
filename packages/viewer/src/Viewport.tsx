@@ -1,10 +1,16 @@
 import { useEffect, useRef } from 'react';
-import { SceneController, type PickResult, type PointPick, type ViewportHandle } from './scene';
+import {
+  SceneController,
+  type PickModifiers,
+  type PickResult,
+  type PointPick,
+  type ViewportHandle,
+} from './scene';
 
 export interface ViewportProps {
   className?: string;
-  /** Called with the picked object, or null when the click hit nothing. */
-  onSelect?: (hit: PickResult | null) => void;
+  /** Called with the picked object (null when the click hit nothing) and the modifier keys. */
+  onSelect?: (hit: PickResult | null, modifiers: PickModifiers) => void;
   /** Called with a surface point while the viewport is in point-pick mode. */
   onPickPoint?: (pick: PointPick) => void;
   /** Called with the handle once the scene exists, and with null before it is torn down. */
@@ -31,7 +37,7 @@ export function Viewport({ className, onSelect, onPickPoint, onReady }: Viewport
     const canvas = canvasRef.current;
     if (!canvas) return;
     const controller = new SceneController(canvas);
-    controller.onPick = (hit) => onSelectRef.current?.(hit);
+    controller.onPick = (hit, modifiers) => onSelectRef.current?.(hit, modifiers);
     controller.onPickPoint = (pick) => onPickPointRef.current?.(pick);
     onReadyRef.current?.(controller);
     return () => {

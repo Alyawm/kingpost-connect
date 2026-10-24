@@ -33,7 +33,7 @@ export class IfcModel {
   private readonly fullIndex = new Map<THREE.Mesh, Uint32Array>();
   private readonly hidden = new Set<number>();
   private readonly tints = new Map<number, THREE.Color>();
-  private selected: number | null = null;
+  private readonly selected = new Set<number>();
 
   constructor(group: THREE.Group, buckets: MeshBucket[]) {
     this.group = group;
@@ -83,11 +83,19 @@ export class IfcModel {
     return null;
   }
 
-  setSelected(expressId: number | null): void {
-    const previous = this.selected;
-    this.selected = expressId;
-    if (previous !== null) this.repaint(previous);
-    if (expressId !== null) this.repaint(expressId);
+  /** Replaces the selection; null or an empty set clears it. */
+  setSelected(expressIds: Iterable<number> | number | null): void {
+    const next = new Set<number>(
+      expressIds === null ? [] : typeof expressIds === 'number' ? [expressIds] : expressIds,
+    );
+    const touched = new Set<number>([...this.selected, ...next]);
+    this.selected.clear();
+    for (const id of next) this.selected.add(id);
+    for (const id of touched) this.repaint(id);
+  }
+
+  get selectedIds(): ReadonlySet<number> {
+    return this.selected;
   }
 
   /** Replaces the per-element tint map (null or empty clears it). Colours are CSS strings or hex numbers. */
@@ -159,8 +167,9 @@ export class IfcModel {
 
   private repaint(expressId: number): void {
     for (const { bucket, range } of this.partsOf.get(expressId) ?? []) {
-      const color =
-        this.selected === expressId ? SELECTION : (this.tints.get(expressId) ?? bucket.baseColor);
+      const color = this.selected.has(expressId)
+        ? SELECTION
+        : (this.tints.get(expressId) ?? bucket.baseColor);
       const attribute = bucket.mesh.geometry.getAttribute('color') as THREE.BufferAttribute;
       const r = Math.round(color.r * 255);
       const g = Math.round(color.g * 255);

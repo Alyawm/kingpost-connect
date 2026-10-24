@@ -26,6 +26,12 @@ export interface PointPick {
   expressId?: number;
 }
 
+/** Keyboard state at the moment of a click, for multi-selection. */
+export interface PickModifiers {
+  ctrl: boolean;
+  shift: boolean;
+}
+
 /** Camera position and orbit target, in world coordinates. */
 export interface CameraState {
   position: [number, number, number];
@@ -91,7 +97,7 @@ export class SceneController implements ViewportHandle {
   /** Measurements and other annotations; not part of the model's bounds. */
   readonly overlay = new THREE.Group();
 
-  onPick: ((hit: PickResult | null) => void) | null = null;
+  onPick: ((hit: PickResult | null, modifiers: PickModifiers) => void) | null = null;
   onPickPoint: ((pick: PointPick) => void) | null = null;
   private pickMode: PickMode = 'select';
 
@@ -109,6 +115,9 @@ export class SceneController implements ViewportHandle {
       canvas,
       antialias: true,
       powerPreference: 'high-performance',
+      // Snapshots read the canvas back after a render; without this WebView2 returns an
+      // empty buffer. The cost is one extra copy per frame, which rendering on demand hides.
+      preserveDrawingBuffer: true,
     });
     this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
 
@@ -374,9 +383,13 @@ export class SceneController implements ViewportHandle {
       return;
     }
 
+    const modifiers: PickModifiers = {
+      ctrl: event.ctrlKey || event.metaKey,
+      shift: event.shiftKey,
+    };
     if (!hit) {
       this.select(null);
-      this.onPick?.(null);
+      this.onPick?.(null, modifiers);
       return;
     }
 
@@ -385,11 +398,11 @@ export class SceneController implements ViewportHandle {
     if (pickable.resolvePick) {
       // The mesh paints its own selection; only report what was hit.
       this.select(null);
-      this.onPick?.(pickable.resolvePick(hit.faceIndex ?? 0));
+      this.onPick?.(pickable.resolvePick(hit.faceIndex ?? 0), modifiers);
       return;
     }
     this.select(mesh);
-    this.onPick?.(pickResultOf(mesh));
+    this.onPick?.(pickResultOf(mesh), modifiers);
   };
 }
 
