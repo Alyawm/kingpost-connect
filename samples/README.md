@@ -6,6 +6,12 @@ GitHub Release and downloaded into this folder by hand.
 
 ## Public models
 
+`public/drawings/workshop-GA-revA.pdf` and `-revB.pdf` are a three-sheet general-arrangement
+set written by `scripts/make-sample-drawings.mjs` (title block with sheet number and title,
+grid, framing members). Revision B deepens one beam and adds a note, so the sheet
+comparison has changes to find. Copy one into a project as `workshop-GA.pdf`, import it,
+then copy the other over it and import again to get two revisions.
+
 All from the `web-ifc` test corpus (`ThatOpen/engine_web-ifc`, `tests/ifcfiles/public/`),
 which is itself a mirror of buildingSMART and KIT sample files.
 
