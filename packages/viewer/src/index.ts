@@ -15,6 +15,13 @@ export {
 export { createSampleFrame } from './sample';
 export { loadIfcToGroup, type IfcLoadStats, type IfcLoadResult } from './ifc/load';
 export { IfcModel, type ElementRange, type MeshBucket } from './ifc/model';
+export {
+  findClashes,
+  type ClashHit,
+  type ClashOptions,
+  type ClashProgress,
+  type ClashSource,
+} from './clash';
 export { IfcFrame, type Triple } from './ifc/coordinates';
 export {
   AnalysisLayer,
@@ -24,6 +31,7 @@ export {
 } from './analysis';
 export {
   createLineObject,
+  createMarkerObject,
   createMeasurementObject,
   formatDistance,
   measure,

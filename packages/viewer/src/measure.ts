@@ -62,6 +62,21 @@ export function createLineObject(
   return line;
 }
 
+/** A small sphere drawn on top of everything, for marking a point such as a clash. */
+export function createMarkerObject(
+  at: THREE.Vector3,
+  color: THREE.ColorRepresentation,
+): THREE.Mesh {
+  const marker = new THREE.Mesh(
+    new THREE.SphereGeometry(0.15, 16, 16),
+    new THREE.MeshBasicMaterial({ color, depthTest: false, transparent: true, opacity: 0.85 }),
+  );
+  marker.position.copy(at);
+  marker.renderOrder = 11;
+  marker.name = 'marker';
+  return marker;
+}
+
 export function formatDistance(metres: number): string {
   if (metres < 1) return `${Math.round(metres * 1000)} mm`;
   return `${metres.toFixed(metres < 10 ? 3 : 2)} m`;

@@ -135,6 +135,33 @@ export class IfcModel {
     return this.hidden;
   }
 
+  /**
+   * World-space triangles of an element as a flat array (nine numbers per triangle), read
+   * from the full index so hidden elements are included. Empty when it has no geometry.
+   */
+  trianglesOf(expressId: number): Float32Array {
+    this.group.updateMatrixWorld(true);
+    const parts = this.partsOf.get(expressId) ?? [];
+    let total = 0;
+    for (const { range } of parts) total += range.indexCount;
+    const out = new Float32Array(total * 3);
+    const point = new THREE.Vector3();
+    let offset = 0;
+    for (const { bucket, range } of parts) {
+      const index = this.fullIndex.get(bucket.mesh);
+      const positions = bucket.mesh.geometry.getAttribute('position');
+      if (!index) continue;
+      const end = range.indexStart + range.indexCount;
+      for (let i = range.indexStart; i < end; i++) {
+        point.fromBufferAttribute(positions, index[i]!).applyMatrix4(bucket.mesh.matrixWorld);
+        out[offset++] = point.x;
+        out[offset++] = point.y;
+        out[offset++] = point.z;
+      }
+    }
+    return out.subarray(0, offset);
+  }
+
   /** World-space bounds of the given elements, or null when none has geometry. */
   boundsOf(ids: Iterable<number>): THREE.Box3 | null {
     this.group.updateMatrixWorld(true);
