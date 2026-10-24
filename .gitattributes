@@ -4,5 +4,4 @@
 *.ico binary
 *.icns binary
 *.wasm binary
-*.ifc binary
 *.pdf binary

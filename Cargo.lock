@@ -1690,12 +1690,26 @@ dependencies = [
 name = "kingpost-connect"
 version = "0.0.1"
 dependencies = [
+ "kp-ifc",
  "kp-project",
+ "kp-store",
  "serde",
  "serde_json",
  "tauri",
  "tauri-build",
  "tauri-plugin-dialog",
+]
+
+[[package]]
+name = "kp-ifc"
+version = "0.0.1"
+dependencies = [
+ "kp-store",
+ "serde",
+ "serde_json",
+ "sha2",
+ "tempfile",
+ "thiserror 2.0.21",
 ]
 
 [[package]]
@@ -1716,6 +1730,7 @@ name = "kp-store"
 version = "0.0.1"
 dependencies = [
  "rusqlite",
+ "serde",
  "tempfile",
  "thiserror 2.0.21",
 ]
