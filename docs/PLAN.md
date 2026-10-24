@@ -193,6 +193,13 @@ Durations assume **2 developers** (one Rust/backend‑leaning, one React/3D‑le
 - **Done when:** a sample ETABS building overlays its IFC within tolerance and section mismatches are reported.
 
 ### Phase 5 — Drawings ↔ model (weeks 28–32) → push `v0.5.0`
+
+> Status 2026‑10‑24: tagged `v0.5.0`. Done: PDF sets as revisions, sheet index with
+> title‑block number/title reading, text search, sheet viewer, region links to elements
+> and saved views both ways, markups (rectangle, cloud, note), links carried forward by
+> sheet number, pixel comparison of two revisions with changed areas boxed. Open: issues
+> raised from sheet markups, vector overlay beyond the pixel pass, scanned sheets (no
+> text). See `docs/devlog/2026-10-phase5-drawings.md` and ADR 007.
 - PDF sheets: import sets, page thumbnails, sheet index (number/title auto‑read from title block, editable), zoom/pan, text search.
 - Markups on sheets (same markup model as 3D), issues from markups.
 - Linking: draw a region on a sheet ↔ element(s) or saved view; click to jump; "where is this on drawings" from 3D.

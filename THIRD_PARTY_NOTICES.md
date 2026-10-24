@@ -29,6 +29,7 @@ Add a row when introducing a new dependency.
 | quick-xml | MIT | BCF XML reading and writing |
 | zip | MIT | BCF archives |
 | calamine | MIT | Reading SAF workbooks (.xlsx) |
+| pdf.js (`pdfjs-dist`) | Apache-2.0 | Rendering and reading PDF drawing sheets |
 
 ## Development only
 

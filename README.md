@@ -12,7 +12,7 @@ Local-first: a project is a folder on disk; all data stays in it.
 
 ## Status
 
-**Analysis model viewing (v0.4.0).** Projects, IFC import with revisions, a viewer with
+**Drawings (v0.5.0).** Projects, IFC import with revisions, a viewer with
 element picking and multi-select, model tree, property inspector, section planes and plan
 views, colour by property or design status, measuring, markups, saved views; the review
 workflow: BCF-native issues with viewpoints, snapshots and comments, an element
@@ -20,7 +20,9 @@ design-status pipeline, a dashboard, and BCF export/import; revision comparison 
 field-level changes, colour by change, CSV export and issues raised from changes; and
 analysis models from ETABS, SAP2000, SAF or the IFC structural view overlaid on the
 physical model, matched to it member by member with section and material differences
-reported. Drawings are the next phase. See [CHANGELOG.md](CHANGELOG.md), the devlogs in
+reported; and PDF drawing sets with a sheet index, search, markups, regions linked to
+elements and saved views, and pixel comparison of two issues. Coordination basics
+(clash checks) are the next phase. See [CHANGELOG.md](CHANGELOG.md), the devlogs in
 [docs/devlog/](docs/devlog/) and the roadmap in [docs/PLAN.md](docs/PLAN.md).
 
 ## Getting started

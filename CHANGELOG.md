@@ -3,6 +3,25 @@
 All notable changes to KingPost Connect. The format follows Keep a Changelog; versions
 follow semantic versioning. Milestone tags match the headings below.
 
+## [0.5.0] — 2026-10-24 — Drawings
+
+PDF drawing sets next to the model, linked both ways, and compared issue by issue.
+
+### Added
+- Drawings section: import PDF sets as revisions; sheet index with thumbnails, numbers and
+  titles read from the title block (editable); search over sheet numbers, titles and page
+  text; open a sheet in the workspace with pan and zoom.
+- Links: draw a region on a sheet to link it to the selected elements or a saved view;
+  double-click a region to jump to the model; "On drawings" in the inspector lists the
+  sheets an element appears on and opens them zoomed to the region. Links are carried
+  onto the sheets of a re-imported set by sheet number.
+- Markups on sheets: rectangles, revision clouds and notes, stored per sheet.
+- Sheet comparison: two revisions paired by sheet number, rendered at the same size and
+  compared pixel by pixel; old-only ink blue, new-only red, changed areas boxed and
+  counted; sheet-by-sheet navigation.
+- Store: migration 005 replaces the placeholder sheet tables with sheets per revision,
+  links, markups and page text.
+
 ## [0.4.0] — 2026-10-24 — Analysis model viewing
 
 Structural analysis models next to the physical model, with the two linked.
