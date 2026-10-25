@@ -10,6 +10,8 @@ export interface PickResult {
   expressId?: number;
   /** Set when an analysis member was hit instead of a mesh. */
   member?: string;
+  /** The loaded model the element belongs to ('main', or a reference model's key). */
+  modelKey?: string;
 }
 
 export type ViewDirection = 'iso' | 'top' | 'bottom' | 'front' | 'back' | 'left' | 'right';
@@ -51,7 +53,8 @@ export interface CameraState {
 export interface ViewportHandle {
   add(object: THREE.Object3D): void;
   remove(object: THREE.Object3D): void;
-  clear(): void;
+  /** Removes and disposes loaded content, except the objects in `keep`. */
+  clear(keep?: THREE.Object3D[]): void;
   /** Overlay objects (measurements, markers) live above the content and survive `clear`. */
   addOverlay(object: THREE.Object3D): void;
   clearOverlay(): void;
@@ -354,9 +357,10 @@ export class SceneController implements ViewportHandle {
     return target.toDataURL('image/jpeg', 0.75);
   }
 
-  clear(): void {
+  clear(keep: THREE.Object3D[] = []): void {
     this.select(null);
     for (const child of [...this.content.children]) {
+      if (keep.includes(child)) continue;
       this.content.remove(child);
       disposeTree(child);
     }

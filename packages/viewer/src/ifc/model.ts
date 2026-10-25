@@ -37,6 +37,8 @@ export interface ElementAppearance {
  */
 export class IfcModel {
   readonly group: THREE.Group;
+  /** Which loaded model this is, reported with every pick ('main' unless federated). */
+  key = 'main';
   readonly buckets: MeshBucket[];
   private readonly partsOf = new Map<number, { bucket: MeshBucket; range: ElementRange }[]>();
   private readonly fullIndex = new Map<THREE.Mesh, Uint32Array>();
@@ -80,7 +82,7 @@ export class IfcModel {
         ...bucket.mesh.userData,
         managedSelection: true,
         resolvePick: (faceIndex: number): PickResult | null =>
-          pickResult(this.expressIdAt(bucket, faceIndex)),
+          pickResult(this.expressIdAt(bucket, faceIndex), this.key),
       };
     }
   }
@@ -219,7 +221,10 @@ export class IfcModel {
     mesh.userData = {
       managedSelection: true,
       resolvePick: (faceIndex: number): PickResult | null =>
-        pickResult(this.idAtFace(bucket, faceIndex, (id) => this.drawnTranslucent(id))),
+        pickResult(
+          this.idAtFace(bucket, faceIndex, (id) => this.drawnTranslucent(id)),
+          this.key,
+        ),
     };
     this.translucent.set(bucket, mesh);
     this.group.add(mesh);
@@ -668,8 +673,8 @@ export class IfcModel {
   }
 }
 
-function pickResult(id: number | null): PickResult | null {
-  return id === null ? null : { name: `#${id}`, type: 'IfcProduct', expressId: id };
+function pickResult(id: number | null, modelKey: string): PickResult | null {
+  return id === null ? null : { name: `#${id}`, type: 'IfcProduct', expressId: id, modelKey };
 }
 
 /** Builds the per-vertex colour attribute every model mesh starts with. */

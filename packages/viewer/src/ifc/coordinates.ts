@@ -23,6 +23,14 @@ export class IfcFrame {
     this.toIfc = this.toViewer.clone().invert();
   }
 
+  /**
+   * The rigid transform that moves geometry loaded in `from`'s viewer space into
+   * `to`'s, so models exported separately line up in IFC world coordinates.
+   */
+  static between(from: IfcFrame, to: IfcFrame): THREE.Matrix4 {
+    return to.toViewer.clone().multiply(from.toIfc);
+  }
+
   static identity(): IfcFrame {
     return new IfcFrame(null);
   }
