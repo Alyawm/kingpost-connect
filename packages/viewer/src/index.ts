@@ -14,7 +14,7 @@ export {
 } from './scene';
 export { createSampleFrame } from './sample';
 export { loadIfcToGroup, type IfcLoadStats, type IfcLoadResult } from './ifc/load';
-export { IfcModel, type ElementRange, type MeshBucket } from './ifc/model';
+export { IfcModel, type ElementAppearance, type ElementRange, type MeshBucket } from './ifc/model';
 export {
   deserializeBuckets,
   modelFromCache,

@@ -35,7 +35,8 @@ export function serializeBuckets(buckets: MeshBucket[], coordination: number[] |
     const normals =
       (geometry.getAttribute('normal')?.array as Float32Array | undefined) ??
       new Float32Array(positions.length);
-    const indices = new Uint32Array(geometry.getIndex()!.array as ArrayLike<number>);
+    const full = bucket.mesh.userData.fullIndex as Uint32Array | undefined;
+    const indices = full ?? new Uint32Array(geometry.getIndex()!.array as ArrayLike<number>);
     const material = bucket.mesh.material as THREE.MeshLambertMaterial;
     parts.push({
       positions,

@@ -18,6 +18,14 @@ export interface MeshBucket {
 }
 
 const SELECTION = new THREE.Color(0xffb020);
+/** Below this an element is not drawn at all (it stays in the model and can be shown again). */
+const INVISIBLE = 0.01;
+
+/** A per-element appearance override: a colour, an opacity (0-1), or both. */
+export interface ElementAppearance {
+  color?: THREE.ColorRepresentation;
+  opacity?: number;
+}
 
 /**
  * A loaded IFC model: few draw calls (one mesh per material) but per-element identity.
@@ -34,13 +42,22 @@ export class IfcModel {
   private readonly hidden = new Set<number>();
   private readonly tints = new Map<number, THREE.Color>();
   private readonly selected = new Set<number>();
+  private readonly overrideColors = new Map<number, THREE.Color>();
+  private readonly overrideOpacity = new Map<number, number>();
+  /** Companion meshes that draw a bucket's see-through elements, created on first use. */
+  private readonly translucent = new Map<MeshBucket, THREE.Mesh>();
 
   constructor(group: THREE.Group, buckets: MeshBucket[]) {
     this.group = group;
     this.buckets = buckets;
     for (const bucket of buckets) {
       const index = bucket.mesh.geometry.getIndex();
-      if (index) this.fullIndex.set(bucket.mesh, new Uint32Array(index.array as ArrayLike<number>));
+      if (index) {
+        const full = new Uint32Array(index.array as ArrayLike<number>);
+        this.fullIndex.set(bucket.mesh, full);
+        // The geometry cache must store every element, whatever is hidden when it is written.
+        bucket.mesh.userData = { ...bucket.mesh.userData, fullIndex: full };
+      }
       for (const range of bucket.ranges) {
         const parts = this.partsOf.get(range.expressId) ?? [];
         parts.push({ bucket, range });
@@ -49,10 +66,8 @@ export class IfcModel {
       bucket.mesh.userData = {
         ...bucket.mesh.userData,
         managedSelection: true,
-        resolvePick: (faceIndex: number): PickResult | null => {
-          const id = this.expressIdAt(bucket, faceIndex);
-          return id === null ? null : { name: `#${id}`, type: 'IfcProduct', expressId: id };
-        },
+        resolvePick: (faceIndex: number): PickResult | null =>
+          pickResult(this.expressIdAt(bucket, faceIndex)),
       };
     }
   }
@@ -73,14 +88,126 @@ export class IfcModel {
   expressIdAt(bucket: MeshBucket, faceIndex: number): number | null {
     // Picking reports faces of the *current* index buffer, which may omit hidden ranges;
     // map the face back through the visible ranges in order.
+    return this.idAtFace(bucket, faceIndex, (id) => this.drawnOpaque(id));
+  }
+
+  private idAtFace(
+    bucket: MeshBucket,
+    faceIndex: number,
+    included: (id: number) => boolean,
+  ): number | null {
     const position = faceIndex * 3;
     let offset = 0;
     for (const range of bucket.ranges) {
-      if (this.hidden.has(range.expressId)) continue;
+      if (!included(range.expressId)) continue;
       if (position < offset + range.indexCount) return range.expressId;
       offset += range.indexCount;
     }
     return null;
+  }
+
+  /** Effective opacity override of an element (1 when it has none). */
+  opacityOf(expressId: number): number {
+    return this.overrideOpacity.get(expressId) ?? 1;
+  }
+
+  private drawnOpaque(id: number): boolean {
+    return !this.hidden.has(id) && this.opacityOf(id) >= 1;
+  }
+
+  private drawnTranslucent(id: number): boolean {
+    if (this.hidden.has(id)) return false;
+    const opacity = this.opacityOf(id);
+    return opacity < 1 && opacity >= INVISIBLE;
+  }
+
+  /**
+   * Replaces every per-element appearance override (null or empty clears them). A colour
+   * wins over the colour-by tint; an opacity below 1 draws the element see-through.
+   * Selection still paints on top of both.
+   */
+  setAppearance(appearance: Map<number, ElementAppearance> | null): void {
+    const colors = new Map<number, THREE.Color>();
+    const opacity = new Map<number, number>();
+    const cache = new Map<THREE.ColorRepresentation, THREE.Color>();
+    for (const [id, look] of appearance ?? []) {
+      if (look.color !== undefined && look.color !== null) {
+        let color = cache.get(look.color);
+        if (!color) {
+          color = new THREE.Color(look.color);
+          cache.set(look.color, color);
+        }
+        colors.set(id, color);
+      }
+      if (typeof look.opacity === 'number' && look.opacity < 1) {
+        opacity.set(id, Math.max(0, look.opacity));
+      }
+    }
+    // Only elements whose look changed are repainted, so small edits stay cheap even
+    // when thousands of elements carry overrides (for example after "ghost others").
+    const touched = new Set<number>();
+    let opacityChanged = false;
+    for (const id of new Set([...this.overrideColors.keys(), ...colors.keys()])) {
+      const before = this.overrideColors.get(id);
+      const after = colors.get(id);
+      if (!before || !after || !before.equals(after)) touched.add(id);
+    }
+    for (const id of new Set([...this.overrideOpacity.keys(), ...opacity.keys()])) {
+      if (this.overrideOpacity.get(id) !== opacity.get(id)) {
+        touched.add(id);
+        opacityChanged = true;
+      }
+    }
+    this.overrideColors.clear();
+    for (const [id, color] of colors) this.overrideColors.set(id, color);
+    this.overrideOpacity.clear();
+    for (const [id, value] of opacity) this.overrideOpacity.set(id, value);
+    for (const id of touched) this.repaint(id);
+    if (opacityChanged) this.rebuildIndices();
+  }
+
+  /** The see-through companion of a bucket: shares positions and normals, own RGBA colours. */
+  private translucentOf(bucket: MeshBucket): THREE.Mesh {
+    const existing = this.translucent.get(bucket);
+    if (existing) return existing;
+    const source = bucket.mesh.geometry;
+    const geometry = new THREE.BufferGeometry();
+    const position = source.getAttribute('position');
+    geometry.setAttribute('position', position);
+    const normal = source.getAttribute('normal');
+    if (normal) geometry.setAttribute('normal', normal);
+    const colors = new Uint8Array(position.count * 4);
+    const rgb = source.getAttribute('color').array as Uint8Array;
+    for (let i = 0; i < position.count; i++) {
+      colors[i * 4] = rgb[i * 3]!;
+      colors[i * 4 + 1] = rgb[i * 3 + 1]!;
+      colors[i * 4 + 2] = rgb[i * 3 + 2]!;
+      colors[i * 4 + 3] = 255;
+    }
+    geometry.setAttribute('color', new THREE.BufferAttribute(colors, 4, true));
+    geometry.setIndex(new THREE.BufferAttribute(new Uint32Array(0), 1));
+    const material = new THREE.MeshLambertMaterial({
+      color: 0xffffff,
+      vertexColors: true,
+      transparent: true,
+      depthWrite: false,
+      side: THREE.DoubleSide,
+    });
+    const mesh = new THREE.Mesh(geometry, material);
+    mesh.name = `${bucket.mesh.name} (see-through)`;
+    mesh.renderOrder = 1;
+    mesh.position.copy(bucket.mesh.position);
+    mesh.quaternion.copy(bucket.mesh.quaternion);
+    mesh.scale.copy(bucket.mesh.scale);
+    mesh.visible = false;
+    mesh.userData = {
+      managedSelection: true,
+      resolvePick: (faceIndex: number): PickResult | null =>
+        pickResult(this.idAtFace(bucket, faceIndex, (id) => this.drawnTranslucent(id))),
+    };
+    this.translucent.set(bucket, mesh);
+    this.group.add(mesh);
+    return mesh;
   }
 
   /** Replaces the selection; null or an empty set clears it. */
@@ -245,6 +372,12 @@ export class IfcModel {
   }
 
   dispose(): void {
+    for (const mesh of this.translucent.values()) {
+      // Positions and normals belong to the bucket mesh and are released with it.
+      mesh.geometry.dispose();
+      (mesh.material as THREE.Material).dispose();
+    }
+    this.translucent.clear();
     for (const bucket of this.buckets) {
       bucket.mesh.geometry.dispose();
       const materials = Array.isArray(bucket.mesh.material)
@@ -258,7 +391,7 @@ export class IfcModel {
     for (const { bucket, range } of this.partsOf.get(expressId) ?? []) {
       const color = this.selected.has(expressId)
         ? SELECTION
-        : (this.tints.get(expressId) ?? bucket.baseColor);
+        : (this.overrideColors.get(expressId) ?? this.tints.get(expressId) ?? bucket.baseColor);
       const attribute = bucket.mesh.geometry.getAttribute('color') as THREE.BufferAttribute;
       const r = Math.round(color.r * 255);
       const g = Math.round(color.g * 255);
@@ -271,6 +404,23 @@ export class IfcModel {
         array[i * 3 + 2] = b;
       }
       attribute.needsUpdate = true;
+
+      const opacity = this.opacityOf(expressId);
+      const companion = opacity < 1 ? this.translucentOf(bucket) : this.translucent.get(bucket);
+      if (!companion) continue;
+      const rgba = companion.geometry.getAttribute('color') as THREE.BufferAttribute;
+      const out = rgba.array as Uint8Array;
+      // A selected see-through element stays readable without turning solid.
+      const alpha = Math.round(
+        (this.selected.has(expressId) ? Math.max(opacity, 0.45) : opacity) * 255,
+      );
+      for (let i = range.vertexStart; i < end; i++) {
+        out[i * 4] = r;
+        out[i * 4 + 1] = g;
+        out[i * 4 + 2] = b;
+        out[i * 4 + 3] = alpha;
+      }
+      rgba.needsUpdate = true;
     }
   }
 
@@ -278,26 +428,51 @@ export class IfcModel {
     for (const bucket of this.buckets) {
       const full = this.fullIndex.get(bucket.mesh);
       if (!full) continue;
-      const anyHidden = bucket.ranges.some((r) => this.hidden.has(r.expressId));
-      if (!anyHidden) {
+      const companion = this.translucent.get(bucket);
+      const plain = bucket.ranges.every(
+        (r) => !this.hidden.has(r.expressId) && this.opacityOf(r.expressId) >= 1,
+      );
+      if (plain) {
         bucket.mesh.geometry.setIndex(new THREE.BufferAttribute(full, 1));
         bucket.mesh.visible = true;
+        if (companion) {
+          companion.geometry.setIndex(new THREE.BufferAttribute(new Uint32Array(0), 1));
+          companion.visible = false;
+        }
         continue;
       }
-      let total = 0;
-      for (const range of bucket.ranges)
-        if (!this.hidden.has(range.expressId)) total += range.indexCount;
-      const filtered = new Uint32Array(total);
-      let cursor = 0;
-      for (const range of bucket.ranges) {
-        if (this.hidden.has(range.expressId)) continue;
-        filtered.set(full.subarray(range.indexStart, range.indexStart + range.indexCount), cursor);
-        cursor += range.indexCount;
+      const opaque = this.collect(bucket, full, (id) => this.drawnOpaque(id));
+      bucket.mesh.geometry.setIndex(new THREE.BufferAttribute(opaque, 1));
+      bucket.mesh.visible = opaque.length > 0;
+      const seeThrough = this.collect(bucket, full, (id) => this.drawnTranslucent(id));
+      if (seeThrough.length > 0 || companion) {
+        const mesh = companion ?? this.translucentOf(bucket);
+        mesh.geometry.setIndex(new THREE.BufferAttribute(seeThrough, 1));
+        mesh.visible = seeThrough.length > 0;
       }
-      bucket.mesh.geometry.setIndex(new THREE.BufferAttribute(filtered, 1));
-      bucket.mesh.visible = total > 0;
     }
   }
+
+  private collect(
+    bucket: MeshBucket,
+    full: Uint32Array,
+    included: (id: number) => boolean,
+  ): Uint32Array {
+    let total = 0;
+    for (const range of bucket.ranges) if (included(range.expressId)) total += range.indexCount;
+    const out = new Uint32Array(total);
+    let cursor = 0;
+    for (const range of bucket.ranges) {
+      if (!included(range.expressId)) continue;
+      out.set(full.subarray(range.indexStart, range.indexStart + range.indexCount), cursor);
+      cursor += range.indexCount;
+    }
+    return out;
+  }
+}
+
+function pickResult(id: number | null): PickResult | null {
+  return id === null ? null : { name: `#${id}`, type: 'IfcProduct', expressId: id };
 }
 
 /** Builds the per-vertex colour attribute every model mesh starts with. */
