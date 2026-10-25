@@ -1,4 +1,4 @@
-import { FolderOpen, X } from 'lucide-react';
+import { Boxes, FolderOpen, X } from 'lucide-react';
 import { Button, cn } from '@kingpost/ui';
 import { t } from '../../lib/i18n';
 import { useModel } from '../../state/model';
@@ -11,6 +11,7 @@ export function Welcome() {
   const busy = useProject((s) => s.busy);
   const openFolder = useProject((s) => s.openFolder);
   const openPath = useProject((s) => s.openPath);
+  const openSample = useProject((s) => s.openSample);
   const recent = useUi((s) => s.recentProjects);
   const forget = useUi((s) => s.forgetProject);
 
@@ -23,6 +24,10 @@ export function Welcome() {
       <Button variant="primary" onClick={() => void openFolder()} disabled={busy}>
         <FolderOpen size={14} />
         {t('welcome.open')}
+      </Button>
+      <Button onClick={() => void openSample()} disabled={busy}>
+        <Boxes size={14} />
+        {t('welcome.sample')}
       </Button>
       <div>
         <div className="mb-1 text-[11px] font-semibold text-fg-muted">{t('welcome.recent')}</div>

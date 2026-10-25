@@ -115,6 +115,8 @@ export const useModel = create<ModelState>((set, get) => ({
       return;
     }
     get().clear();
+    // A pick on the start-up frame or a previous model must not linger in the inspector.
+    useViewer.getState().setSelection(null);
     set({ loading: true, relPath, revision });
     log.info(`Loading ${relPath} (revision ${revision.idx})…`);
     try {

@@ -19,6 +19,7 @@ pub fn run() {
             project::project_is_project,
             project::project_create,
             project::project_open,
+            project::project_sample,
             project::project_close,
             project::project_current,
             model::project_files,

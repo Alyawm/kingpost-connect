@@ -121,6 +121,11 @@ export function projectCreate(root: string, name: string): Promise<ProjectInfo> 
   return invoke<ProjectInfo>('project_create', { root, name });
 }
 
+/** Opens (creating when needed) the sample project with the bundled sample model. */
+export function projectSample(): Promise<ProjectInfo> {
+  return invoke<ProjectInfo>('project_sample');
+}
+
 export function projectOpen(root: string): Promise<ProjectInfo> {
   return invoke<ProjectInfo>('project_open', { root });
 }

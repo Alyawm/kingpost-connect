@@ -35,6 +35,12 @@ Add a row when introducing a new dependency.
 | rust_xlsxwriter | MIT / Apache-2.0 | Schedule export to XLSX |
 | TanStack Virtual (`@tanstack/react-virtual`) | MIT | Virtualised schedule grid |
 
+## Bundled sample data
+
+| Item | Source | Use |
+|---|---|---|
+| `duplex.ifc` (Duplex Apartment) | buildingSMART public sample model, as mirrored in the web-ifc test corpus (`ThatOpen/engine_web-ifc`, `tests/ifcfiles/public/`) | Copied into "KingPost Sample" by "Try the sample project" |
+
 ## Development only
 
 | Component | Licence |

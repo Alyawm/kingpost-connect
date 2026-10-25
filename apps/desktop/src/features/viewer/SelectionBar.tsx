@@ -1,8 +1,10 @@
-import { useMemo } from 'react';
+import { useEffect, useMemo, useState, type ReactNode } from 'react';
 import { EyeOff, Focus, Ghost, Palette, RotateCcw, ScanSearch, X } from 'lucide-react';
-import { IconButton, Popover } from '@kingpost/ui';
+import { IconButton, Popover, cn } from '@kingpost/ui';
 import { commonLook, hasLook, useAppearance } from '../../state/appearance';
 import { useModel } from '../../state/model';
+import { useProject } from '../../state/project';
+import { useViewer } from '../../state/viewer';
 import { AppearanceEditor, LookDot } from './AppearanceEditor';
 
 /**
@@ -19,9 +21,46 @@ export function SelectionBar() {
   const ghostOthers = useAppearance((s) => s.ghostOthers);
   const reset = useAppearance((s) => s.reset);
 
+  const hasModel = useModel((s) => s.model !== null);
+  const loading = useModel((s) => s.loading);
+  const viewerPick = useViewer((s) => s.selection);
+  const busy = useProject((s) => s.busy);
+  const openSample = useProject((s) => s.openSample);
+  const [everSelected, setEverSelected] = useState(false);
+
   const ids = useMemo(() => [...selectedIds], [selectedIds]);
   const common = useMemo(() => commonLook(looks, ids), [looks, ids]);
-  if (ids.length === 0) return null;
+  useEffect(() => {
+    if (ids.length > 0) setEverSelected(true);
+  }, [ids.length]);
+
+  if (!hasModel && !loading && viewerPick) {
+    // The start-up frame is a picture, not a model: say how to get one that can be edited.
+    return (
+      <Hint>
+        <span>
+          This is a demo frame. Open a project and load an IFC model to change colours, transparency
+          and visibility.
+        </span>
+        <button
+          type="button"
+          disabled={busy}
+          className="shrink-0 rounded bg-accent px-2 py-0.5 font-medium text-white hover:opacity-90 disabled:opacity-50"
+          onClick={() => void openSample()}
+        >
+          Try the sample project
+        </button>
+      </Hint>
+    );
+  }
+  if (ids.length === 0) {
+    return hasModel && !everSelected ? (
+      <Hint muted>
+        Click an element to colour, hide or isolate it · Ctrl+click adds more · groups have their
+        own controls in the Model panel
+      </Hint>
+    ) : null;
+  }
 
   return (
     <div className="pointer-events-none absolute inset-x-0 bottom-3 flex justify-center">
@@ -72,6 +111,22 @@ export function SelectionBar() {
         <IconButton label="Clear selection (Esc)" size="sm" onClick={() => void select(null)}>
           <X size={14} />
         </IconButton>
+      </div>
+    </div>
+  );
+}
+
+function Hint({ children, muted }: { children: ReactNode; muted?: boolean }) {
+  return (
+    <div className="pointer-events-none absolute inset-x-0 bottom-3 flex justify-center px-4">
+      <div
+        role="status"
+        className={cn(
+          'pointer-events-auto flex max-w-xl items-center gap-3 rounded-md border border-edge px-3 py-1.5 text-[11px] shadow-lg',
+          muted ? 'bg-surface/80 text-fg-muted' : 'bg-surface/95 text-fg',
+        )}
+      >
+        {children}
       </div>
     </div>
   );

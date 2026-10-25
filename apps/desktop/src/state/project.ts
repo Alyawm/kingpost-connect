@@ -9,6 +9,7 @@ import {
   projectFiles,
   projectIsProject,
   projectOpen,
+  projectSample,
   type ImportSummary,
   type ProjectFile,
   type ProjectInfo,
@@ -29,6 +30,8 @@ interface ProjectState {
   openFolder(): Promise<void>;
   /** Opens a known folder without the picker (recent projects). */
   openPath(root: string): Promise<void>;
+  /** Opens the bundled sample project, imports its model once and shows it. */
+  openSample(): Promise<void>;
   close(): Promise<void>;
   importFile(relPath: string): Promise<ImportSummary | null>;
   /** Refreshes the file list when the shell reports changes in the project folder. */
@@ -111,6 +114,36 @@ export const useProject = create<ProjectState>((set, get) => ({
     } finally {
       set({ busy: false });
     }
+  },
+
+  openSample: async () => {
+    if (!isTauri()) return;
+    set({ busy: true });
+    let info: ProjectInfo;
+    try {
+      info = await projectSample();
+      useModel.getState().clear();
+      set({ current: info });
+      useUi.getState().rememberProject(info.root);
+      log.info(`Opened the sample project at ${info.root}`);
+      await get().refreshFiles();
+    } catch (error) {
+      log.error(`Could not open the sample project: ${String(error)}`);
+      return;
+    } finally {
+      set({ busy: false });
+    }
+    let file = get().files.find((f) => f.kind === 'ifc');
+    if (!file) return;
+    if (file.revisions.length === 0) {
+      await get().importFile(file.rel_path);
+      file = get().files.find((f) => f.rel_path === file?.rel_path);
+    }
+    const revision = file?.revisions[file.revisions.length - 1];
+    if (!file || !revision) return;
+    await useModel.getState().load(file.rel_path, revision);
+    useUi.setState({ section: 'viewer', leftOpen: true });
+    log.info('Select elements in the model to change their colour and transparency.');
   },
 
   close: async () => {

@@ -4,7 +4,7 @@ use std::path::PathBuf;
 
 use kp_project::Project;
 use serde::Serialize;
-use tauri::{AppHandle, State};
+use tauri::{AppHandle, Manager, State, path::BaseDirectory};
 
 use super::{AppState, describe, watcher::FolderWatcher};
 
@@ -80,6 +80,38 @@ pub fn project_open(
     root: String,
 ) -> Result<ProjectInfo, String> {
     let project = Project::open(&PathBuf::from(root)).map_err(describe)?;
+    adopt(&app, &state, project)
+}
+
+/// File name of the sample model bundled with the application.
+const SAMPLE_MODEL: &str = "duplex.ifc";
+
+/// Opens the sample project, creating it first when needed: a "KingPost Sample" folder in
+/// the user's Documents holding a copy of the bundled sample model. An existing copy is
+/// never overwritten, so work done in the sample project survives.
+#[tauri::command]
+pub fn project_sample(app: AppHandle, state: State<'_, AppState>) -> Result<ProjectInfo, String> {
+    let base = app
+        .path()
+        .document_dir()
+        .or_else(|_| app.path().app_data_dir())
+        .map_err(|e| format!("no folder for the sample project: {e}"))?;
+    let root = base.join("KingPost Sample");
+    std::fs::create_dir_all(&root).map_err(|e| format!("{}: {e}", root.display()))?;
+    let target = root.join(SAMPLE_MODEL);
+    if !target.exists() {
+        let source = app
+            .path()
+            .resolve(format!("samples/{SAMPLE_MODEL}"), BaseDirectory::Resource)
+            .map_err(|e| format!("sample model not found: {e}"))?;
+        std::fs::copy(&source, &target).map_err(|e| format!("{}: {e}", source.display()))?;
+    }
+    let project = if Project::is_project(&root) {
+        Project::open(&root)
+    } else {
+        Project::create(&root, "KingPost Sample")
+    }
+    .map_err(describe)?;
     adopt(&app, &state, project)
 }
 
