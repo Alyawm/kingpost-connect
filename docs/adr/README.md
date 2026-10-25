@@ -20,6 +20,7 @@ Read them in order to understand why the code looks the way it does.
 | [009](009-updates-licensing-diagnostics.md) | Updates only on request, licences checked offline, diagnostics stay local | Accepted |
 | [010](010-schedules.md) | Schedules are definitions evaluated in Rust; geometry quantities come from the viewer once | Accepted |
 | [011](011-element-appearance.md) | Appearance overrides painted in the merged meshes; see-through elements in companion meshes; views by GlobalId | Accepted |
+| [012](012-section-planes.md) | Section planes as point and normal toward the removed side; handles drawn in a second pass | Accepted |
 
 ## Template
 

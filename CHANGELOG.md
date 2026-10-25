@@ -3,6 +3,25 @@
 All notable changes to KingPost Connect. The format follows Keep a Changelog; versions
 follow semantic versioning. Milestone tags match the headings below.
 
+## [1.3.0] — 2026-10-25 — Sections, selection and schedule formulas
+
+### Added
+- Section planes like a field viewer: place a plane on any face, drag its arrow to cut,
+  any number of planes (together a section box), flip, switch off, move with a slider,
+  hide handles. Planes are kept in saved views and BCF viewpoints (all of them, at any
+  angle).
+- Box selection with Shift+drag (window left to right, crossing right to left, Ctrl adds).
+- Drag and drop files onto the window: copied into the project, IFC imported and shown.
+- A saved view can be the project's default look, applied when a model opens.
+- Schedule formula columns (`[Mass] / [Length]`, column letters, `+ - * / ^`), column
+  reordering by drag with formulas following their columns, renaming by double-click.
+
+### Changed
+- The middle mouse button pans; the wheel zooms towards the cursor.
+- Schedule lengths, areas and volumes use the units declared in the IFC file; the "over 50
+  means millimetres" rule remains only for models that declare none.
+- Elements cut away by a section plane can no longer be picked through it.
+
 ## [1.2.1] — 2026-10-25 — Sample project
 
 ### Added

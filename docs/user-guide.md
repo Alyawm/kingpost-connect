@@ -31,13 +31,27 @@ storey, type, material and property sets. Importing the same file again after it
 makes the next revision; earlier revisions stay. **Load** shows a revision in the viewer.
 A revision opened once is cached and opens faster afterwards.
 
-In the viewer: drag to orbit, right-drag or middle-drag to pan, wheel to zoom, `F` to fit.
-Click an element to select it and see its properties in the inspector; `Ctrl+click` adds
-to the selection. The model tree (Viewer section) lists storeys and types; isolate, hide and
-show-all act on the selection. Section planes cut the model along an axis; "plan of
-storey" places a cut just below a storey's top and looks down. Colour the model by type,
-material, storey, design status, revision change or analysis link. Measure between two
-points; draw markup lines.
+**Drag and drop.** Drop IFC, PDF or analysis files onto the window to copy them into the
+project; IFC files are imported and the last one is shown. A file already in the project
+folder is used where it is; a newer copy with the same name replaces the old file, so its
+import becomes the next revision. With no project open, the folder of the dropped file
+becomes the project.
+
+In the viewer: drag to orbit, middle-drag or right-drag to pan, wheel to zoom towards the
+cursor, `F` to fit. Click an element to select it and see its properties in the inspector;
+`Ctrl+click` adds to the selection. **Shift+drag** draws a selection box: left to right
+takes elements entirely inside it, right to left also takes those it touches; hold `Ctrl`
+as well to add to the selection. Colour the model by type, material, storey, design status,
+revision change or analysis link. Measure between two points; draw markup lines.
+
+**Section planes.** Use **Place on face** (or the scissors in the viewport toolbar) and
+click any face: a plane is placed on it, facing out of the face, and nothing is cut yet.
+Drag the plane's arrow into the model to cut. Add as many planes as needed; every enabled
+plane cuts, so planes on several sides make a section box. In the Model panel each plane
+can be switched off, flipped to keep the other side, moved with a slider, or removed; the
+eye hides the plane handles. **+ Plan**, **+ X** and **+ Z** add planes through the model
+centre, and "Plan view of storey" places a cut just below a storey's top and looks down.
+Section planes are saved in views and in issue viewpoints (BCF).
 
 **Colours and transparency.** With elements selected, a bar at the bottom of the viewport
 offers Appearance (colour swatches, a custom colour, a transparency slider), Hide (`H`),
@@ -55,7 +69,8 @@ transparency and hidden elements, with a thumbnail. Click a view to return to it
 view to update it with what is on screen now, rename or delete it. Views remember elements
 by their IFC GlobalId, so a view saved on one revision also applies to the next; elements
 that no longer exist are reported in the output panel. "Default view" shows everything in
-its original colours without a section.
+its original colours without a section. The star on a view makes it the project's default
+look: it is applied whenever a model of the project is opened.
 
 ## Review
 
@@ -124,6 +139,13 @@ geometry once otherwise; mass is volume times a density from the project's densi
 (editable in the panel; common steel, concrete, timber, aluminium and masonry names have
 defaults, and materials without one are listed). Click a row to select its elements in the
 model. Save a schedule as a preset for the project; export as XLSX or CSV with totals.
+
+Columns carry letters (A, B, C…). **+ Formula** adds a column computed from others, for
+example `[Mass] / [Length]` for mass per metre or `C / D * 1000`; it understands `+ - * /`,
+`^` and parentheses, and gives no value where an input is empty. Drag columns by their
+handle to reorder them (letters in formulas follow their columns); double-click a column
+name to rename it. Lengths, areas and volumes from the model's quantities are converted
+using the units the IFC file declares (millimetres, feet and so on).
 
 ## Settings and help
 
