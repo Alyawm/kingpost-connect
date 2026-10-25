@@ -55,6 +55,9 @@ interface ReviewState {
   refresh(): Promise<void>;
   openIssue(id: string | null): Promise<void>;
   createIssue(form: NewIssueForm, withViewpoint: boolean): Promise<IssueRow | null>;
+  /** Changes each time something asks the Review panel to open the new-issue form. */
+  newIssueRequest: number;
+  requestNewIssue(): void;
   updateIssue(id: string, patch: IssuePatch): Promise<void>;
   deleteIssue(id: string): Promise<void>;
   addComment(issueId: string, text: string, withViewpoint: boolean): Promise<void>;
@@ -102,6 +105,12 @@ export const useReview = create<ReviewState>((set, get) => ({
     } catch (error) {
       log.error(`Could not open issue: ${String(error)}`);
     }
+  },
+
+  newIssueRequest: 0,
+  requestNewIssue: () => {
+    set({ newIssueRequest: get().newIssueRequest + 1 });
+    useUi.setState({ section: 'review', leftOpen: true });
   },
 
   createIssue: async (form, withViewpoint) => {

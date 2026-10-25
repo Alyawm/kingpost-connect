@@ -222,6 +222,12 @@ function NewIssue() {
   const createIssue = useReview((s) => s.createIssue);
   const selected = useModel((s) => s.selectedIds.size);
   const hasModel = useModel((s) => !!s.model);
+  const request = useReview((s) => s.newIssueRequest);
+
+  // The header's "issue from selection" opens the form.
+  useEffect(() => {
+    if (request > 0) setOpen(true);
+  }, [request]);
 
   const update = (patch: Partial<NewIssueForm>) => setForm((f) => ({ ...f, ...patch }));
 

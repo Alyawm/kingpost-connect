@@ -32,6 +32,14 @@ interface UiState {
   checkUpdatesAtStartup: boolean;
   /** Project folders opened before, newest first. */
   recentProjects: string[];
+  /** Project folders kept on the Projects page regardless of how recently they were used. */
+  pinnedProjects: string[];
+  /** Display name and last opening of each known project folder. */
+  projectMeta: Record<string, { name: string; openedAt: string }>;
+  /** The Projects page is shown over the workspace. */
+  homeOpen: boolean;
+  setHomeOpen(open: boolean): void;
+  togglePin(root: string): void;
   /** The getting-started checklist is shown until dismissed. */
   onboardingDismissed: boolean;
   setTheme(theme: Theme): void;
@@ -44,7 +52,7 @@ interface UiState {
   setSettingsOpen(open: boolean): void;
   setHelpOpen(open: boolean): void;
   setCheckUpdatesAtStartup(on: boolean): void;
-  rememberProject(root: string): void;
+  rememberProject(root: string, name?: string): void;
   forgetProject(root: string): void;
   dismissOnboarding(): void;
 }
@@ -71,7 +79,19 @@ export const useUi = create<UiState>()(
       helpOpen: false,
       checkUpdatesAtStartup: false,
       recentProjects: [],
+      pinnedProjects: [],
+      projectMeta: {},
+      homeOpen: false,
       onboardingDismissed: false,
+      setHomeOpen: (homeOpen) => set({ homeOpen }),
+      togglePin: (root) => {
+        const pinned = get().pinnedProjects;
+        set({
+          pinnedProjects: pinned.includes(root)
+            ? pinned.filter((r) => r !== root)
+            : [root, ...pinned],
+        });
+      },
       setTheme: (theme) => set({ theme }),
       toggleTheme: () => set({ theme: get().theme === 'dark' ? 'light' : 'dark' }),
       setAuthor: (author) => set({ author }),
@@ -86,12 +106,27 @@ export const useUi = create<UiState>()(
       setSettingsOpen: (settingsOpen) => set({ settingsOpen }),
       setHelpOpen: (helpOpen) => set({ helpOpen }),
       setCheckUpdatesAtStartup: (checkUpdatesAtStartup) => set({ checkUpdatesAtStartup }),
-      rememberProject: (root) =>
+      rememberProject: (root, name) =>
         set({
-          recentProjects: [root, ...get().recentProjects.filter((r) => r !== root)].slice(0, 8),
+          recentProjects: [root, ...get().recentProjects.filter((r) => r !== root)].slice(0, 12),
+          projectMeta: {
+            ...get().projectMeta,
+            [root]: {
+              name:
+                name ??
+                get().projectMeta[root]?.name ??
+                root.split(/[\\/]/).filter(Boolean).pop() ??
+                root,
+              openedAt: new Date().toISOString(),
+            },
+          },
+          homeOpen: false,
         }),
       forgetProject: (root) =>
-        set({ recentProjects: get().recentProjects.filter((r) => r !== root) }),
+        set({
+          recentProjects: get().recentProjects.filter((r) => r !== root),
+          pinnedProjects: get().pinnedProjects.filter((r) => r !== root),
+        }),
       dismissOnboarding: () => set({ onboardingDismissed: true }),
     }),
     {
@@ -104,6 +139,8 @@ export const useUi = create<UiState>()(
         bottomOpen: s.bottomOpen,
         checkUpdatesAtStartup: s.checkUpdatesAtStartup,
         recentProjects: s.recentProjects,
+        pinnedProjects: s.pinnedProjects,
+        projectMeta: s.projectMeta,
         onboardingDismissed: s.onboardingDismissed,
       }),
     },

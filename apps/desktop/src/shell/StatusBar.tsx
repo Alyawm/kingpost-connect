@@ -1,14 +1,5 @@
-import {
-  CircleHelp,
-  Download,
-  Moon,
-  PanelBottom,
-  PanelLeft,
-  PanelRight,
-  Settings,
-  Sun,
-} from 'lucide-react';
-import { IconButton, Kbd } from '@kingpost/ui';
+import { Download, PanelBottom, PanelLeft, PanelRight } from 'lucide-react';
+import { IconButton } from '@kingpost/ui';
 import { useApp } from '../state/app';
 import { useProject } from '../state/project';
 import { useUi } from '../state/ui';
@@ -19,15 +10,10 @@ import { t } from '../lib/i18n';
 export function StatusBar() {
   const info = useApp((s) => s.info);
   const project = useProject((s) => s.current);
-  const theme = useUi((s) => s.theme);
-  const toggleTheme = useUi((s) => s.toggleTheme);
   const togglePanel = useUi((s) => s.togglePanel);
   const leftOpen = useUi((s) => s.leftOpen);
   const rightOpen = useUi((s) => s.rightOpen);
   const bottomOpen = useUi((s) => s.bottomOpen);
-  const setPalette = useUi((s) => s.setPalette);
-  const setSettingsOpen = useUi((s) => s.setSettingsOpen);
-  const setHelpOpen = useUi((s) => s.setHelpOpen);
   const licence = useLicence((s) => s.status);
   const updates = useUpdates((s) => s.state);
   const install = useUpdates((s) => s.install);
@@ -58,13 +44,6 @@ export function StatusBar() {
           {updates.total ? ` ${Math.round((100 * updates.received) / updates.total)}%` : ''}
         </span>
       )}
-      <button
-        type="button"
-        className="flex items-center gap-1.5 rounded px-1.5 py-0.5 hover:bg-surface-2 hover:text-fg"
-        onClick={() => setPalette(true)}
-      >
-        Commands <Kbd>Ctrl+K</Kbd>
-      </button>
       <IconButton
         label="Toggle side panel"
         size="sm"
@@ -88,19 +67,6 @@ export function StatusBar() {
         onClick={() => togglePanel('right')}
       >
         <PanelRight size={14} />
-      </IconButton>
-      <IconButton label={t('help.title')} size="sm" onClick={() => setHelpOpen(true)}>
-        <CircleHelp size={14} />
-      </IconButton>
-      <IconButton label={t('settings.title')} size="sm" onClick={() => setSettingsOpen(true)}>
-        <Settings size={14} />
-      </IconButton>
-      <IconButton
-        label={theme === 'dark' ? 'Switch to light theme' : 'Switch to dark theme'}
-        size="sm"
-        onClick={toggleTheme}
-      >
-        {theme === 'dark' ? <Sun size={14} /> : <Moon size={14} />}
       </IconButton>
       <span className="pl-1 font-mono">{info ? `${info.name} ${info.version}` : '…'}</span>
     </footer>

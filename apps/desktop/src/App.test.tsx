@@ -1,4 +1,4 @@
-import { render, screen, act } from '@testing-library/react';
+import { render, screen, act, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { TooltipProvider } from '@kingpost/ui';
 import { App } from './App';
@@ -70,5 +70,30 @@ describe('App shell', () => {
       await userEvent.click(screen.getByRole('button', { name: 'Review' }));
     });
     expect(screen.getByRole('heading', { name: 'Review' })).toBeInTheDocument();
+  });
+
+  it('opens on the Projects page while no project is open, with the title bar and tools', () => {
+    useUi.setState({ homeOpen: false, recentProjects: [], pinnedProjects: [] });
+    renderApp();
+    expect(screen.getByTestId('projects-home')).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'Projects' })).toBeInTheDocument();
+    expect(screen.getByText(/No projects yet/)).toBeInTheDocument();
+    expect(screen.getByRole('toolbar', { name: 'Tools' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /Projects/ })).toBeInTheDocument();
+  });
+
+  it('lists pinned and recent projects', () => {
+    useUi.setState({
+      homeOpen: true,
+      recentProjects: ['C:/work/Tower', 'C:/work/Bridge'],
+      pinnedProjects: ['C:/work/Bridge'],
+      projectMeta: { 'C:/work/Tower': { name: 'Tower', openedAt: new Date().toISOString() } },
+    });
+    renderApp();
+    const home = within(screen.getByTestId('projects-home'));
+    expect(home.getByRole('heading', { name: 'Pinned' })).toBeInTheDocument();
+    expect(home.getByText('Tower')).toBeInTheDocument();
+    expect(home.getByText('Bridge')).toBeInTheDocument();
+    expect(home.getByText('Opened just now')).toBeInTheDocument();
   });
 });

@@ -57,6 +57,9 @@ interface ViewState {
   /** Element edge lines on the model (remembered between sessions). */
   edges: boolean;
   setNavMode(mode: NavigationMode): void;
+  /** Left drag draws a selection box instead of orbiting. */
+  boxSelect: boolean;
+  setBoxSelect(on: boolean): void;
   setEdges(on: boolean): void;
   colorBy: ColorBy;
   legend: LegendEntry[];
@@ -202,6 +205,7 @@ export const useView = create<ViewState>((set, get) => ({
   activePlaneId: null,
   showPlaneHandles: true,
   navMode: 'orbit',
+  boxSelect: false,
   edges: loadEdges(),
   colorBy: 'none',
   legend: [],
@@ -269,6 +273,12 @@ export const useView = create<ViewState>((set, get) => ({
     if (mode === 'walk') {
       log.info('Walk: drag to look around, W A S D or arrows to move, Q/E down/up, Shift faster.');
     }
+  },
+
+  setBoxSelect: (on) => {
+    set({ boxSelect: on });
+    if (on && get().tool !== 'select') get().setTool('select');
+    useViewer.getState().handle?.setBoxSelect(on);
   },
 
   setEdges: (on) => {

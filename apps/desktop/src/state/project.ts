@@ -95,7 +95,7 @@ export const useProject = create<ProjectState>((set, get) => ({
       const info = existing ? await projectOpen(root) : await projectCreate(root, folderName(root));
       useModel.getState().clear();
       set({ current: info });
-      useUi.getState().rememberProject(info.root);
+      useUi.getState().rememberProject(info.root, info.name);
       log.info(`${existing ? 'Opened' : 'Created'} project "${info.name}" at ${info.root}`);
       await get().refreshFiles();
       return true;
@@ -166,7 +166,7 @@ export const useProject = create<ProjectState>((set, get) => ({
       const info = await projectOpen(root);
       useModel.getState().clear();
       set({ current: info });
-      useUi.getState().rememberProject(info.root);
+      useUi.getState().rememberProject(info.root, info.name);
       log.info(`Opened project "${info.name}" at ${info.root}`);
       await get().refreshFiles();
     } catch (error) {
@@ -184,7 +184,7 @@ export const useProject = create<ProjectState>((set, get) => ({
       info = await projectSample();
       useModel.getState().clear();
       set({ current: info });
-      useUi.getState().rememberProject(info.root);
+      useUi.getState().rememberProject(info.root, info.name);
       log.info(`Opened the sample project at ${info.root}`);
       await get().refreshFiles();
     } catch (error) {
