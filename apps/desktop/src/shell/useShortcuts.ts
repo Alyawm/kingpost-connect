@@ -2,6 +2,7 @@ import { useEffect } from 'react';
 import { listCommands } from './commands';
 import { useUi } from '../state/ui';
 import { useView } from '../state/view';
+import { useMeasure } from '../state/measure';
 import { useModel } from '../state/model';
 
 function isTyping(target: EventTarget | null): boolean {
@@ -23,6 +24,18 @@ export function useShortcuts(): void {
       }
       if (isTyping(event.target) || useUi.getState().paletteOpen) return;
 
+      // Esc first drops a measurement in progress, then leaves the tool.
+      if (event.key === 'Escape' && useMeasure.getState().points.length > 0) {
+        useMeasure.getState().cancel();
+        return;
+      }
+      if (
+        (event.key === 'Backspace' || event.key === 'Delete') &&
+        useView.getState().tool === 'measure'
+      ) {
+        useMeasure.getState().removeLast();
+        return;
+      }
       if (event.key === 'Escape' && useView.getState().tool !== 'select') {
         useView.getState().setTool('select');
         return;

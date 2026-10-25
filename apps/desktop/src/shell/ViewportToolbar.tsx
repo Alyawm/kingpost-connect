@@ -22,6 +22,8 @@ import { useModel } from '../state/model';
 import { useView } from '../state/view';
 import { useHistory } from '../state/history';
 import { useUi } from '../state/ui';
+import { useMeasure } from '../state/measure';
+import { MeasurePanel, SnapTip } from '../features/viewer/MeasurePanel';
 
 const navModes: { value: NavigationMode; label: string; icon: typeof Hand }[] = [
   { value: 'orbit', label: 'Orbit: left drag turns around the model', icon: Rotate3d },
@@ -41,7 +43,7 @@ export function ViewportToolbar() {
   const tool = useView((s) => s.tool);
   const setTool = useView((s) => s.setTool);
   const pending = useView((s) => s.pendingPoint);
-  const measurements = useView((s) => s.measurements);
+  const measureCount = useMeasure((s) => s.records.length);
   const clearMeasurements = useView((s) => s.clearMeasurements);
   const markups = useView((s) => s.markups);
   const clearMarkups = useView((s) => s.clearMarkups);
@@ -113,7 +115,11 @@ export function ViewportToolbar() {
               </IconButton>
             )}
             <IconButton
-              label={tool === 'measure' ? 'Stop measuring (Esc)' : 'Measure distance'}
+              label={
+                tool === 'measure'
+                  ? 'Stop measuring (Esc)'
+                  : 'Measure: distance, angle, perpendicular, edge, point'
+              }
               size="sm"
               active={tool === 'measure'}
               disabled={!handle}
@@ -143,7 +149,7 @@ export function ViewportToolbar() {
             >
               <PenLine size={14} />
             </IconButton>
-            {(measurements.length > 0 || markups.length > 0) && (
+            {(measureCount > 0 || markups.length > 0) && (
               <IconButton
                 label="Clear measurements and markups"
                 size="sm"
@@ -182,7 +188,7 @@ export function ViewportToolbar() {
             </IconButton>
           </div>
         </div>
-        {tool !== 'select' && (
+        {tool !== 'select' && tool !== 'measure' && (
           <div className="pointer-events-none rounded-md border border-edge bg-surface/90 px-2 py-1 text-[11px] text-fg-muted shadow">
             {tool === 'section'
               ? 'Click a face: the plane is placed on it, then drag its arrow to cut'
@@ -191,19 +197,9 @@ export function ViewportToolbar() {
                 : `Click the first point on the model${tool === 'markup' ? ' to draw a line' : ''}`}
           </div>
         )}
-        {measurements.length > 0 && (
-          <ul className="pointer-events-auto max-h-40 overflow-auto rounded-md border border-edge bg-surface/90 px-2 py-1 font-mono text-[11px] shadow">
-            {measurements.map((m, index) => (
-              <li key={index} className="flex gap-3">
-                <span className="text-fg">{m.distance.toFixed(3)} m</span>
-                <span className="text-fg-muted">
-                  Δx {m.delta.x.toFixed(2)} · Δy {m.delta.y.toFixed(2)} · Δz {m.delta.z.toFixed(2)}
-                </span>
-              </li>
-            ))}
-          </ul>
-        )}
+        <MeasurePanel />
       </div>
+      <SnapTip />
       <div className="pointer-events-none absolute bottom-14 right-3">
         <ViewCube handle={handle} />
       </div>

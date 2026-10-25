@@ -12,6 +12,7 @@ import {
 import { useViewer } from '../state/viewer';
 import { useModel } from '../state/model';
 import { useView } from '../state/view';
+import { useMeasure } from '../state/measure';
 import { useAnalysis } from '../state/analysis';
 import { useFederation } from '../state/federation';
 import { useDrawings } from '../state/drawings';
@@ -62,6 +63,10 @@ export function Workspace() {
     useView.getState().pickPoint(pick);
   }, []);
 
+  const onHoverPoint = useCallback((pick: PointPick | null) => {
+    if (useView.getState().tool === 'measure') useMeasure.getState().hoverAt(pick);
+  }, []);
+
   const onClipPlaneMove = useCallback((id: string, point: [number, number, number]) => {
     useView.getState().movePlane(id, point, true);
   }, []);
@@ -101,6 +106,7 @@ export function Workspace() {
           onReady={onReady}
           onSelect={onSelect}
           onPickPoint={onPickPoint}
+          onHoverPoint={onHoverPoint}
           onClipPlaneMove={onClipPlaneMove}
           onClipPlaneSelect={onClipPlaneSelect}
           onBoxSelect={onBoxSelect}

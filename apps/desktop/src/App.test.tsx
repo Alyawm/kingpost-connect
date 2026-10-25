@@ -6,6 +6,7 @@ import { useUi } from './state/ui';
 
 // The viewport needs WebGL; jsdom has none. The shell is what these tests exercise.
 vi.mock('@kingpost/viewer', () => ({
+  DEFAULT_SNAP: { vertex: true, midpoint: true, edge: true, face: true },
   Viewport: () => <canvas data-testid="viewport" />,
   createSampleFrame: () => ({}),
   ViewCube: () => null,

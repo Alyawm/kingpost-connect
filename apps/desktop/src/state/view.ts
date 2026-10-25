@@ -2,18 +2,16 @@ import { create } from 'zustand';
 import {
   Vector3,
   createLineObject,
-  createMeasurementObject,
-  measure,
   planeOffset,
   snapToAxis,
   withOffset,
   type ClipPlaneSpec,
-  type Measurement,
   type NavigationMode,
   type PointPick,
 } from '@kingpost/viewer';
 import type { ElementSummary, Triple } from '../lib/ipc';
 import { log } from './log';
+import { useMeasure } from './measure';
 import { useModel } from './model';
 import { useViewer } from './viewer';
 
@@ -64,7 +62,6 @@ interface ViewState {
   legend: LegendEntry[];
   /** First point of a measurement or markup in progress, if any. */
   pendingPoint: PointPick | null;
-  measurements: Measurement[];
   markups: MarkupLine[];
   setTool(tool: Tool): void;
   pickPoint(pick: PointPick): void;
@@ -209,16 +206,20 @@ export const useView = create<ViewState>((set, get) => ({
   colorBy: 'none',
   legend: [],
   pendingPoint: null,
-  measurements: [],
   markups: [],
 
   setTool: (tool) => {
+    if (tool !== 'measure') useMeasure.getState().cancel();
     set({ tool, pendingPoint: null });
     useViewer.getState().handle?.setPickMode(tool === 'select' ? 'select' : 'point');
   },
 
   pickPoint: (pick) => {
-    const { pendingPoint, measurements, markups, tool } = get();
+    const { pendingPoint, markups, tool } = get();
+    if (tool === 'measure') {
+      useMeasure.getState().pick(pick);
+      return;
+    }
     if (tool === 'section') {
       // A plane on the clicked face, removing what is in front of it; drag it inwards to cut.
       const normal = snapToAxis(pick.normal ?? new Vector3(0, 1, 0));
@@ -240,29 +241,17 @@ export const useView = create<ViewState>((set, get) => ({
       set({ pendingPoint: null, markups: [...markups, line] });
       return;
     }
-    const result = measure(pendingPoint.point, pick.point);
-    handle?.addOverlay(createMeasurementObject(result));
-    set({ pendingPoint: null, measurements: [...measurements, result] });
-    const d = result.delta;
-    log.info(
-      `Measured ${result.distance.toFixed(3)} m (Δx ${d.x.toFixed(3)}, Δy ${d.y.toFixed(3)}, Δz ${d.z.toFixed(3)})`,
-    );
   },
 
   clearMeasurements: () => {
-    const handle = useViewer.getState().handle;
-    handle?.clearOverlay();
-    // Markups live in the same overlay; redraw the ones that stay.
-    for (const line of get().markups) {
-      handle?.addOverlay(createLineObject(vector(line.start), vector(line.end)));
-    }
-    set({ measurements: [], pendingPoint: null });
+    useMeasure.getState().clear();
   },
 
   clearMarkups: () => {
     const handle = useViewer.getState().handle;
     handle?.clearOverlay();
-    for (const m of get().measurements) handle?.addOverlay(createMeasurementObject(m));
+    // Measurements share the overlay; draw them again.
+    useMeasure.getState().redraw();
     set({ markups: [], pendingPoint: null });
   },
 
@@ -413,7 +402,6 @@ export const useView = create<ViewState>((set, get) => ({
       colorBy: 'none',
       legend: [],
       pendingPoint: null,
-      measurements: [],
       markups: [],
     });
     handle?.setClipPlanes([], null, get().showPlaneHandles);

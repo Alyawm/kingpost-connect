@@ -2,6 +2,7 @@ import type { LinkReport, ProjectFile } from '../lib/ipc';
 
 // The store pulls in the viewer (WebGL) and Tauri; neither exists under jsdom.
 vi.mock('@kingpost/viewer', () => ({
+  DEFAULT_SNAP: { vertex: true, midpoint: true, edge: true, face: true },
   AnalysisLayer: class {},
   IfcFrame: { identity: () => ({}) },
   Vector3: class {},

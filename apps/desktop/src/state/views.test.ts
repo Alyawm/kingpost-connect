@@ -3,6 +3,7 @@ import type { Look } from './appearance';
 
 // The stores pull in the viewer (WebGL) and Tauri; neither exists under jsdom.
 vi.mock('@kingpost/viewer', () => ({
+  DEFAULT_SNAP: { vertex: true, midpoint: true, edge: true, face: true },
   Vector3: class {},
   createLineObject: vi.fn(),
   createMeasurementObject: vi.fn(),
