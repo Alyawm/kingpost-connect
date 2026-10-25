@@ -43,6 +43,12 @@ interface SchedulesState {
   setDefinition(patch: Partial<ScheduleDefinition>): void;
   addColumn(key: ColumnKey, label: string, aggregate?: Aggregate): void;
   removeColumn(index: number): void;
+  /** Moves a column; letter references in formulas follow the columns they named. */
+  moveColumn(from: number, to: number): void;
+  /** Renames a column or changes a formula. */
+  updateColumn(index: number, patch: { label?: string; expr?: string }): void;
+  /** Adds an empty formula column. */
+  addFormula(): void;
   setAggregate(index: number, aggregate: Aggregate): void;
   toggleGroup(key: ColumnKey): void;
   run(): Promise<void>;
@@ -64,7 +70,43 @@ export function sameKey(a: ColumnKey, b: ColumnKey): boolean {
   if (a.kind === 'field' && b.kind === 'field') return a.field === b.field;
   if (a.kind === 'property' && b.kind === 'property') return a.pset === b.pset && a.name === b.name;
   if (a.kind === 'derived' && b.kind === 'derived') return a.quantity === b.quantity;
+  // Formula columns are never treated as duplicates of each other.
   return false;
+}
+
+/** Spreadsheet-style letter of a column index: 0 → A, 26 → AA (as the formulas use). */
+export function columnLetter(index: number): string {
+  let out = '';
+  let i = index;
+  for (;;) {
+    out = String.fromCharCode(65 + (i % 26)) + out;
+    if (i < 26) return out;
+    i = Math.floor(i / 26) - 1;
+  }
+}
+
+function letterIndex(letters: string): number | null {
+  let index = 0;
+  for (const c of letters.toUpperCase()) {
+    if (c < 'A' || c > 'Z') return null;
+    index = index * 26 + (c.charCodeAt(0) - 64);
+  }
+  return index - 1;
+}
+
+/**
+ * Rewrites letter references in a formula after columns moved: `order[newIndex]` is the
+ * old index of the column now at `newIndex`. Bracketed names are left alone.
+ */
+export function remapFormula(expr: string, order: number[]): string {
+  const newIndexOf = new Map(order.map((oldIndex, newIndex) => [oldIndex, newIndex]));
+  return expr.replace(/\[[^\]]*\]|[A-Za-z]+/g, (token) => {
+    if (token.startsWith('[')) return token;
+    const old = letterIndex(token);
+    if (old === null) return token;
+    const next = newIndexOf.get(old);
+    return next === undefined ? token : columnLetter(next);
+  });
 }
 
 export function keyLabel(key: ColumnKey): string {
@@ -75,6 +117,8 @@ export function keyLabel(key: ColumnKey): string {
       return key.pset === '*' ? key.name : `${key.pset}/${key.name}`;
     case 'derived':
       return key.quantity;
+    case 'formula':
+      return `= ${key.expr}`;
   }
 }
 
@@ -161,6 +205,58 @@ export const useSchedules = create<SchedulesState>((set, get) => ({
     });
   },
 
+  moveColumn: (from, to) => {
+    const current = get().definition ?? EMPTY;
+    const n = current.columns.length;
+    if (from === to || from < 0 || to < 0 || from >= n || to >= n) return;
+    const order = current.columns.map((_, i) => i);
+    const [moved] = order.splice(from, 1);
+    order.splice(to, 0, moved!);
+    const columns = order.map((old) => {
+      const column = current.columns[old]!;
+      return column.key.kind === 'formula'
+        ? {
+            ...column,
+            key: { kind: 'formula' as const, expr: remapFormula(column.key.expr, order) },
+          }
+        : column;
+    });
+    const sortBy = current.sort_by === null ? null : order.indexOf(current.sort_by);
+    set({ definition: { ...current, columns, sort_by: sortBy } });
+  },
+
+  updateColumn: (index, patch) => {
+    const current = get().definition ?? EMPTY;
+    set({
+      definition: {
+        ...current,
+        columns: current.columns.map((c, i) => {
+          if (i !== index) return c;
+          const next = { ...c };
+          if (patch.label !== undefined) next.label = patch.label;
+          if (patch.expr !== undefined && c.key.kind === 'formula') {
+            next.key = { kind: 'formula', expr: patch.expr };
+          }
+          return next;
+        }),
+      },
+    });
+  },
+
+  addFormula: () => {
+    const current = get().definition ?? EMPTY;
+    const count = current.columns.filter((c) => c.key.kind === 'formula').length;
+    set({
+      definition: {
+        ...current,
+        columns: [
+          ...current.columns,
+          { key: { kind: 'formula', expr: '' }, label: `Formula ${count + 1}`, aggregate: 'sum' },
+        ],
+      },
+    });
+  },
+
   setAggregate: (index, aggregate) => {
     const current = get().definition ?? EMPTY;
     set({
@@ -201,6 +297,7 @@ export const useSchedules = create<SchedulesState>((set, get) => ({
             ? `; no density for ${table.missing_densities.join(', ')}`
             : ''),
       );
+      for (const error of table.formula_errors ?? []) log.warn(`Formula ${error}`);
     } catch (error) {
       log.error(`Schedule failed: ${String(error)}`);
     } finally {

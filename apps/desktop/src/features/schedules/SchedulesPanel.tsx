@@ -3,6 +3,7 @@ import {
   ChevronDown,
   ChevronRight,
   Download,
+  GripVertical,
   Play,
   Plus,
   Save,
@@ -14,7 +15,13 @@ import { Button, IconButton, Panel, PanelBody, PanelHeader, cn } from '@kingpost
 import type { Aggregate, ColumnKey, ScheduleDefinition } from '../../lib/ipc';
 import { useModel } from '../../state/model';
 import { useProject } from '../../state/project';
-import { EMPTY_SCHEDULE, keyLabel, sameKey, useSchedules } from '../../state/schedules';
+import {
+  EMPTY_SCHEDULE,
+  keyLabel,
+  sameKey,
+  useSchedules,
+  columnLetter,
+} from '../../state/schedules';
 
 const subtle = 'text-[10px] text-fg-muted';
 const field = 'h-6 w-full rounded border border-edge bg-canvas px-1 text-xs';
@@ -132,6 +139,12 @@ function Editor() {
   const addColumn = useSchedules((s) => s.addColumn);
   const removeColumn = useSchedules((s) => s.removeColumn);
   const setAggregate = useSchedules((s) => s.setAggregate);
+  const moveColumn = useSchedules((s) => s.moveColumn);
+  const updateColumn = useSchedules((s) => s.updateColumn);
+  const addFormula = useSchedules((s) => s.addFormula);
+  const formulaErrors = useSchedules((s) => s.table?.formula_errors ?? []);
+  const [dragFrom, setDragFrom] = useState<number | null>(null);
+  const [renaming, setRenaming] = useState<number | null>(null);
   const toggleGroup = useSchedules((s) => s.toggleGroup);
   const run = useSchedules((s) => s.run);
   const save = useSchedules((s) => s.save);
@@ -221,47 +234,131 @@ function Editor() {
         <div className="mt-1 space-y-1">
           <ul className="space-y-0.5">
             {definition.columns.map((c, i) => (
-              <li key={i} className="flex items-center gap-1">
-                <button
-                  type="button"
-                  className={cn(
-                    'shrink-0 rounded border px-1 text-[10px]',
-                    isGrouped(c.key) ? 'border-accent text-fg' : 'border-edge text-fg-muted',
-                  )}
-                  title="Group by this column"
-                  onClick={() => toggleGroup(c.key)}
-                >
-                  group
-                </button>
-                <span className="min-w-0 flex-1 truncate" title={keyLabel(c.key)}>
-                  {c.label}
-                </span>
-                {c.key.kind !== 'field' && (
-                  <select
-                    className="h-5 rounded border border-edge bg-canvas text-[10px]"
-                    value={c.aggregate}
-                    aria-label="Aggregate"
-                    onChange={(e) => setAggregate(i, e.target.value as Aggregate)}
-                  >
-                    {AGGREGATES.map((a) => (
-                      <option key={a} value={a}>
-                        {a}
-                      </option>
-                    ))}
-                  </select>
+              <li
+                key={i}
+                draggable
+                onDragStart={(e) => {
+                  setDragFrom(i);
+                  e.dataTransfer.effectAllowed = 'move';
+                }}
+                onDragOver={(e) => {
+                  if (dragFrom !== null) e.preventDefault();
+                }}
+                onDrop={(e) => {
+                  e.preventDefault();
+                  if (dragFrom !== null) moveColumn(dragFrom, i);
+                  setDragFrom(null);
+                }}
+                onDragEnd={() => setDragFrom(null)}
+                className={cn(
+                  'rounded',
+                  dragFrom === i && 'opacity-40',
+                  dragFrom !== null && dragFrom !== i && 'hover:bg-surface-2',
                 )}
-                <button
-                  type="button"
-                  className="shrink-0 rounded p-0.5 text-fg-muted hover:bg-surface-2"
-                  title="Remove column"
-                  onClick={() => removeColumn(i)}
-                >
-                  <X size={11} />
-                </button>
+              >
+                <div className="flex items-center gap-1">
+                  <GripVertical
+                    size={11}
+                    className="shrink-0 cursor-grab text-fg-muted"
+                    aria-label="Drag to reorder"
+                  />
+                  <span
+                    className="w-4 shrink-0 text-center font-mono text-[10px] text-fg-muted"
+                    title="Column letter, for formulas"
+                  >
+                    {columnLetter(i)}
+                  </span>
+                  <button
+                    type="button"
+                    className={cn(
+                      'shrink-0 rounded border px-1 text-[10px]',
+                      isGrouped(c.key) ? 'border-accent text-fg' : 'border-edge text-fg-muted',
+                    )}
+                    title="Group by this column"
+                    onClick={() => toggleGroup(c.key)}
+                  >
+                    group
+                  </button>
+                  {renaming === i ? (
+                    <input
+                      autoFocus
+                      className="h-5 min-w-0 flex-1 rounded border border-accent bg-canvas px-1 text-[11px] outline-none"
+                      defaultValue={c.label}
+                      aria-label="Column name"
+                      onBlur={(e) => {
+                        if (e.target.value.trim())
+                          updateColumn(i, { label: e.target.value.trim() });
+                        setRenaming(null);
+                      }}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter') (e.target as HTMLInputElement).blur();
+                        if (e.key === 'Escape') setRenaming(null);
+                      }}
+                    />
+                  ) : (
+                    <span
+                      className="min-w-0 flex-1 truncate"
+                      title={`${keyLabel(c.key)} · double-click to rename`}
+                      onDoubleClick={() => setRenaming(i)}
+                    >
+                      {c.label}
+                    </span>
+                  )}
+                  {c.key.kind !== 'field' && (
+                    <select
+                      className="h-5 rounded border border-edge bg-canvas text-[10px]"
+                      value={c.aggregate}
+                      aria-label="Aggregate"
+                      onChange={(e) => setAggregate(i, e.target.value as Aggregate)}
+                    >
+                      {AGGREGATES.map((a) => (
+                        <option key={a} value={a}>
+                          {a}
+                        </option>
+                      ))}
+                    </select>
+                  )}
+                  <button
+                    type="button"
+                    className="shrink-0 rounded p-0.5 text-fg-muted hover:bg-surface-2"
+                    title="Remove column"
+                    onClick={() => removeColumn(i)}
+                  >
+                    <X size={11} />
+                  </button>
+                </div>
+                {c.key.kind === 'formula' && (
+                  <input
+                    className={cn(field, 'mt-0.5 h-6 font-mono text-[11px]')}
+                    placeholder="e.g. [Mass] / [Length]   or   C / B * 1000"
+                    defaultValue={c.key.expr}
+                    key={`${i}:${c.key.expr}`}
+                    aria-label={`Formula for ${c.label}`}
+                    onBlur={(e) => updateColumn(i, { expr: e.target.value })}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') (e.target as HTMLInputElement).blur();
+                    }}
+                  />
+                )}
               </li>
             ))}
           </ul>
+          {formulaErrors.length > 0 && (
+            <ul className="rounded border border-danger/50 px-1.5 py-1 text-[10px] text-danger">
+              {formulaErrors.map((error) => (
+                <li key={error}>{error}</li>
+              ))}
+            </ul>
+          )}
           <div className="flex flex-wrap gap-1">
+            <button
+              type="button"
+              className="rounded border border-edge px-1 text-[10px] hover:bg-surface-2"
+              title="A column computed from others, e.g. [Mass] / [Length]"
+              onClick={addFormula}
+            >
+              <Plus size={9} className="inline" /> Formula
+            </button>
             {FIELDS.map(([f, label]) => (
               <button
                 key={f}

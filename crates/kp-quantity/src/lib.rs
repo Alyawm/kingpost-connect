@@ -12,6 +12,7 @@ use kp_store::{DensityRow, ElementSummary, GeometryQuantity, PropertyFact, Store
 use serde::{Deserialize, Serialize};
 
 pub mod export;
+pub mod formula;
 pub mod presets;
 
 #[derive(Debug, thiserror::Error)]
@@ -35,6 +36,8 @@ pub enum ColumnKey {
     /// A quantity from base quantities, else from the geometry: `length`, `volume`,
     /// `area`, `mass`, `count`.
     Derived { quantity: String },
+    /// Arithmetic over other columns, by letter (`C / B`) or label (`[Mass] / [Length]`).
+    Formula { expr: String },
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
@@ -140,6 +143,50 @@ pub struct Table {
     pub element_count: usize,
     /// Elements whose mass needed a density that is not in the table, by material.
     pub missing_densities: Vec<String>,
+    /// Formula columns that could not be read, as "label: reason".
+    #[serde(default)]
+    pub formula_errors: Vec<String>,
+}
+
+/// Factors that turn the model's own length, area and volume units into metres, square
+/// metres and cubic metres, read from the revision's unit assignment. `None` when the
+/// model does not say, in which case lengths fall back to the "over 50 is millimetres" rule.
+#[derive(Debug, Clone, Copy, Default, PartialEq)]
+pub struct UnitScales {
+    pub length: Option<f64>,
+    pub area: Option<f64>,
+    pub volume: Option<f64>,
+}
+
+impl UnitScales {
+    /// From a revision's `units_json` (`{"length":"mm","area":"m²",...}`).
+    pub fn from_units_json(json: &str) -> Self {
+        let value: serde_json::Value = serde_json::from_str(json).unwrap_or_default();
+        let get = |k: &str| value.get(k).and_then(|v| v.as_str()).map(str::to_owned);
+        let length = get("length").and_then(|u| length_factor(&u));
+        Self {
+            length,
+            area: get("area")
+                .and_then(|u| length_factor(u.trim_end_matches(['²', '2'])))
+                .map(|f| f * f),
+            volume: get("volume")
+                .and_then(|u| length_factor(u.trim_end_matches(['³', '3'])))
+                .map(|f| f * f * f),
+        }
+    }
+}
+
+fn length_factor(unit: &str) -> Option<f64> {
+    Some(match unit.trim() {
+        "m" => 1.0,
+        "mm" => 0.001,
+        "cm" => 0.01,
+        "dm" => 0.1,
+        "km" => 1000.0,
+        "in" => 0.0254,
+        "ft" => 0.3048,
+        _ => return None,
+    })
 }
 
 /// Default densities in kg/m³, used when the project's table has no entry.
@@ -172,6 +219,7 @@ struct Context<'a> {
     properties: HashMap<&'a str, Vec<&'a PropertyFact>>,
     geometry: &'a HashMap<i64, GeometryQuantity>,
     densities: &'a [DensityRow],
+    scales: UnitScales,
 }
 
 impl Context<'_> {
@@ -242,8 +290,14 @@ pub fn evaluate(store: &Store, revision_id: i64, definition: &Definition) -> Res
     let facts = store.properties_of_revision(revision_id)?;
     let geometry = store.geometry_quantities(revision_id)?;
     let densities = store.densities()?;
+    let scales = store
+        .revisions(None)?
+        .into_iter()
+        .find(|r| r.id == revision_id)
+        .map(|r| UnitScales::from_units_json(&r.units_json))
+        .unwrap_or_default();
     Ok(evaluate_with(
-        definition, &elements, &facts, &geometry, &densities,
+        definition, &elements, &facts, &geometry, &densities, scales,
     ))
 }
 
@@ -254,6 +308,7 @@ pub fn evaluate_with(
     facts: &[PropertyFact],
     geometry: &HashMap<i64, GeometryQuantity>,
     densities: &[DensityRow],
+    scales: UnitScales,
 ) -> Table {
     let mut properties: HashMap<&str, Vec<&PropertyFact>> = HashMap::new();
     for f in facts {
@@ -263,8 +318,27 @@ pub fn evaluate_with(
         properties,
         geometry,
         densities,
+        scales,
     };
     let mut missing = Vec::new();
+
+    // Formulas are parsed once against the column labels; bad ones are reported.
+    let labels: Vec<String> = definition.columns.iter().map(|c| c.label.clone()).collect();
+    let mut formula_errors = Vec::new();
+    let formulas: Vec<Option<formula::Expr>> = definition
+        .columns
+        .iter()
+        .map(|c| match &c.key {
+            ColumnKey::Formula { expr } => match formula::parse(expr, &labels) {
+                Ok(parsed) => Some(parsed),
+                Err(error) => {
+                    formula_errors.push(format!("{}: {error}", c.label));
+                    None
+                }
+            },
+            _ => None,
+        })
+        .collect();
 
     let filter = &definition.filter;
     let text = filter.text.trim().to_ascii_lowercase();
@@ -299,11 +373,12 @@ pub fn evaluate_with(
     let mut element_rows: Vec<(Vec<String>, Row)> = selected
         .iter()
         .map(|e| {
-            let cells: Vec<Cell> = definition
+            let mut cells: Vec<Cell> = definition
                 .columns
                 .iter()
                 .map(|c| value_of(&context, e, &c.key, &mut missing))
                 .collect();
+            apply_formulas(&formulas, &mut cells);
             let keys: Vec<String> = definition
                 .group_by
                 .iter()
@@ -360,6 +435,38 @@ pub fn evaluate_with(
         rows,
         element_count: selected.len(),
         missing_densities: missing,
+        formula_errors,
+    }
+}
+
+/// Fills formula cells from the row's other cells. Formulas may read formulas; a few
+/// passes settle any order of columns, and a cycle simply stays empty.
+fn apply_formulas(formulas: &[Option<formula::Expr>], cells: &mut [Cell]) {
+    if formulas.iter().all(Option::is_none) {
+        return;
+    }
+    for _ in 0..formulas.len() {
+        let mut changed = false;
+        for (i, expr) in formulas.iter().enumerate() {
+            let Some(expr) = expr else { continue };
+            let num = formula::evaluate(expr, &|j| {
+                if j == i {
+                    None
+                } else {
+                    cells.get(j).and_then(|c| c.num)
+                }
+            });
+            if num != cells[i].num {
+                cells[i] = Cell {
+                    text: num.map(format_number).unwrap_or_default(),
+                    num,
+                };
+                changed = true;
+            }
+        }
+        if !changed {
+            break;
+        }
     }
 }
 
@@ -492,10 +599,14 @@ fn value_of(
                 "count" => Some(1.0),
                 "length" => context
                     .quantity_property(&e.global_id, &["Length", "NetLength"])
-                    .map(to_metres_if_mm)
+                    .map(|v| match context.scales.length {
+                        Some(factor) => v * factor,
+                        None => to_metres_if_mm(v),
+                    })
                     .or_else(|| context.geometry.get(&e.express_id).and_then(|g| g.length)),
                 "volume" => context
                     .quantity_property(&e.global_id, &["NetVolume", "GrossVolume", "Volume"])
+                    .map(|v| v * context.scales.volume.unwrap_or(1.0))
                     .or_else(|| context.geometry.get(&e.express_id).and_then(|g| g.volume)),
                 "area" => context
                     .quantity_property(
@@ -508,6 +619,7 @@ fn value_of(
                             "OuterSurfaceArea",
                         ],
                     )
+                    .map(|v| v * context.scales.area.unwrap_or(1.0))
                     .or_else(|| {
                         context
                             .geometry
@@ -525,6 +637,7 @@ fn value_of(
                                 &e.global_id,
                                 &["NetVolume", "GrossVolume", "Volume"],
                             )
+                            .map(|v| v * context.scales.volume.unwrap_or(1.0))
                             .or_else(|| {
                                 context.geometry.get(&e.express_id).and_then(|g| g.volume)
                             })?;
@@ -539,6 +652,8 @@ fn value_of(
                 num,
             }
         }
+        // Filled in after the other columns of the row (see `apply_formulas`).
+        ColumnKey::Formula { .. } => Cell::default(),
     }
 }
 
@@ -719,7 +834,14 @@ mod tests {
                 bbox_max: [0.0; 3],
             },
         );
-        let table = evaluate_with(&steel_schedule(), &elements, &facts, &geometry, &[]);
+        let table = evaluate_with(
+            &steel_schedule(),
+            &elements,
+            &facts,
+            &geometry,
+            &[],
+            UnitScales::default(),
+        );
 
         assert_eq!(table.element_count, 3, "the column is filtered out");
         assert_eq!(table.missing_densities, vec!["Mystery alloy".to_owned()]);
@@ -773,7 +895,14 @@ mod tests {
             group_by: vec![],
             ..steel_schedule()
         };
-        let table = evaluate_with(&definition, &elements, &facts, &HashMap::new(), &densities);
+        let table = evaluate_with(
+            &definition,
+            &elements,
+            &facts,
+            &HashMap::new(),
+            &densities,
+            UnitScales::default(),
+        );
         assert_eq!(table.rows[0].cells[2].num, Some(8000.0));
     }
 
@@ -784,5 +913,94 @@ mod tests {
         assert_eq!(format_number(6.0), "6");
         assert_eq!(format_number(324.9), "324.9");
         assert_eq!(format_number(0.0414), "0.041");
+    }
+
+    #[test]
+    fn formula_columns_compute_per_row_and_total() {
+        let elements = vec![
+            element(1, "IFCBEAM", "B1", "L1", "S355"),
+            element(2, "IFCBEAM", "B2", "L1", "S355"),
+        ];
+        let facts = vec![
+            fact(1, "Qto_BeamBaseQuantities", "Length", 6.0),
+            fact(1, "Qto_BeamBaseQuantities", "NetVolume", 0.0414),
+            fact(2, "Qto_BeamBaseQuantities", "Length", 4.0),
+            fact(2, "Qto_BeamBaseQuantities", "NetVolume", 0.0276),
+        ];
+        let mut definition = Definition {
+            group_by: vec![],
+            sort_by: None,
+            ..steel_schedule()
+        };
+        definition.columns.push(Column {
+            key: ColumnKey::Formula {
+                expr: "[Mass] / B".into(),
+            },
+            label: "kg/m".into(),
+            aggregate: Aggregate::Avg,
+        });
+        // A formula that reads a later formula still settles.
+        definition.columns.push(Column {
+            key: ColumnKey::Formula {
+                expr: "[kg/m] * 1000".into(),
+            },
+            label: "g/m".into(),
+            aggregate: Aggregate::None,
+        });
+        definition.columns.push(Column {
+            key: ColumnKey::Formula {
+                expr: "[Width] * 2".into(),
+            },
+            label: "Broken".into(),
+            aggregate: Aggregate::None,
+        });
+        let table = evaluate_with(
+            &definition,
+            &elements,
+            &facts,
+            &HashMap::new(),
+            &[],
+            UnitScales::default(),
+        );
+        let b1 = &table.rows[0];
+        assert!((b1.cells[4].num.unwrap() - 0.0414 * 7850.0 / 6.0).abs() < 1e-9);
+        assert!((b1.cells[5].num.unwrap() - 0.0414 * 7850.0 / 6.0 * 1000.0).abs() < 1e-6);
+        assert_eq!(b1.cells[6].num, None);
+        assert_eq!(table.formula_errors.len(), 1);
+        assert!(table.formula_errors[0].starts_with("Broken: "));
+        let total = table.rows.last().unwrap();
+        assert!((total.cells[4].num.unwrap() - 0.0414 * 7850.0 / 6.0).abs() < 1e-6);
+    }
+
+    #[test]
+    fn model_units_replace_the_millimetre_guess() {
+        let scales = UnitScales::from_units_json(r#"{"length":"mm","area":"mm²","volume":"m³"}"#);
+        assert_eq!(scales.length, Some(0.001));
+        assert!((scales.area.unwrap() - 1e-6).abs() < 1e-15);
+        assert_eq!(scales.volume, Some(1.0));
+        assert_eq!(UnitScales::from_units_json("{}"), UnitScales::default());
+        assert_eq!(
+            UnitScales::from_units_json(r#"{"length":"ft"}"#).length,
+            Some(0.3048)
+        );
+
+        // A 30 mm plate thickness in a millimetre model: the guess would keep 30 m.
+        let elements = vec![element(1, "IFCBEAM", "P1", "L1", "S355")];
+        let facts = vec![fact(1, "Qto_BeamBaseQuantities", "Length", 30.0)];
+        let definition = Definition {
+            group_by: vec![],
+            ..steel_schedule()
+        };
+        let guessed = evaluate_with(
+            &definition,
+            &elements,
+            &facts,
+            &HashMap::new(),
+            &[],
+            UnitScales::default(),
+        );
+        assert_eq!(guessed.rows[0].cells[1].num, Some(30.0));
+        let known = evaluate_with(&definition, &elements, &facts, &HashMap::new(), &[], scales);
+        assert_eq!(known.rows[0].cells[1].num, Some(0.03));
     }
 }

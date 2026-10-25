@@ -171,6 +171,7 @@ mod tests {
             ],
             element_count: 1,
             missing_densities: vec![],
+            formula_errors: vec![],
         }
     }
 
