@@ -2,6 +2,9 @@ import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import type { AnalysisLayer } from './analysis';
 import { ClipGizmos, closestOnLine, toThreePlane, type ClipPlaneSpec } from './clip';
+import { createPreviewObject } from './measure';
+import { DEFAULT_SNAP, snapToSegments, type SnapKind, type SnapOptions } from './snap';
+import type { IfcModel } from './ifc/model';
 
 /** What the viewport reports when the user clicks an object. */
 export interface PickResult {
@@ -27,6 +30,16 @@ export interface PointPick {
   /** World-space normal of the face that was hit, facing the camera. */
   normal?: THREE.Vector3;
   expressId?: number;
+  /** The loaded model the point is on. */
+  modelKey?: string;
+  /** What the point snapped to. */
+  snap?: SnapKind;
+  /** The edge segment for edge and midpoint snaps (and corners: one of its edges). */
+  edge?: [THREE.Vector3, THREE.Vector3];
+  /** Pointer position in pixels relative to the viewport, for tips next to the cursor. */
+  screen?: { x: number; y: number };
+  /** Shift was held (ortho while measuring). */
+  shift?: boolean;
 }
 
 /** A screen rectangle in normalised device coordinates (-1..1), for box selection. */
@@ -79,6 +92,12 @@ export interface ViewportHandle {
   setClipPlanes(planes: ClipPlaneSpec[], activeId: string | null, showHandles: boolean): void;
   /** The camera, for projecting elements during box selection. */
   getCameraObject(): THREE.Camera;
+  /** Which snaps measurement points may use. */
+  setSnapOptions(options: SnapOptions): void;
+  /** A dashed preview polyline (for a measurement in progress); null removes it. */
+  setPreview(points: THREE.Vector3[] | null): void;
+  /** Removes one overlay object (a single measurement) and frees it. */
+  removeOverlay(object: THREE.Object3D): void;
   select(object: THREE.Mesh | null): void;
   render(): void;
 }
@@ -100,6 +119,13 @@ interface PickableUserData {
 }
 
 const SELECTION_COLOR = new THREE.Color(0xffb020);
+/** Snap marker colours: corner, midpoint, edge, face. */
+const SNAP_COLORS: Record<SnapKind, number> = {
+  vertex: 0x3ccf7a,
+  midpoint: 0x4dd4e0,
+  edge: 0xff6b9d,
+  face: 0xffb020,
+};
 const CLICK_TOLERANCE_PX = 4;
 
 /**
@@ -131,6 +157,14 @@ export class SceneController implements ViewportHandle {
     null;
   private readonly gizmos = new ClipGizmos();
   private readonly cameraListeners = new Set<() => void>();
+  /** Hover feedback for point picking: snap marker, snapped edge, preview line. */
+  private readonly hud = new THREE.Scene();
+  private snapOptions: SnapOptions = DEFAULT_SNAP;
+  private hoverFrame = 0;
+  private hoverEvent: PointerEvent | null = null;
+  private preview: THREE.Line | null = null;
+  /** Point picking: the snapped point under the pointer as it moves (null when none). */
+  onHoverPoint: ((pick: PointPick | null) => void) | null = null;
   private animation = 0;
   private navMode: NavigationMode = 'orbit';
   private look: { x: number; y: number } | null = null;
@@ -261,8 +295,143 @@ export class SceneController implements ViewportHandle {
     this.requestRender();
   }
 
+  setSnapOptions(options: SnapOptions): void {
+    this.snapOptions = { ...options };
+  }
+
+  setPreview(points: THREE.Vector3[] | null): void {
+    if (this.preview) {
+      this.hud.remove(this.preview);
+      this.preview.geometry.dispose();
+      (this.preview.material as THREE.Material).dispose();
+      this.preview = null;
+    }
+    if (points && points.length >= 2) {
+      this.preview = createPreviewObject(points);
+      this.hud.add(this.preview);
+    }
+    this.requestRender();
+  }
+
+  removeOverlay(object: THREE.Object3D): void {
+    this.overlay.remove(object);
+    disposeTree(object);
+    this.requestRender();
+  }
+
+  /** The snap marker and edge highlight; kept apart from the preview line. */
+  private showSnap(pick: PointPick | null): void {
+    for (const child of [...this.hud.children]) {
+      if (child === this.preview) continue;
+      this.hud.remove(child);
+      disposeTree(child);
+    }
+    if (pick) {
+      const color = SNAP_COLORS[pick.snap ?? 'face'];
+      if (pick.edge && pick.snap !== 'face') {
+        const line = new THREE.Line(
+          new THREE.BufferGeometry().setFromPoints(pick.edge),
+          new THREE.LineBasicMaterial({ color, depthTest: false, transparent: true }),
+        );
+        this.hud.add(line);
+      }
+      const dot = new THREE.Points(
+        new THREE.BufferGeometry().setFromPoints([pick.point]),
+        new THREE.PointsMaterial({
+          color,
+          size: pick.snap === 'face' ? 7 : 11,
+          sizeAttenuation: false,
+          depthTest: false,
+          transparent: true,
+        }),
+      );
+      this.hud.add(dot);
+    }
+    this.requestRender();
+  }
+
+  /** The pick under the pointer, snapped to corners, midpoints, edges or the face. */
+  private snapAt(event: PointerEvent): PointPick | null {
+    const rect = this.canvas.getBoundingClientRect();
+    this.raycaster.setFromCamera(this.pointerNdc(event), this.camera);
+    const hit = this.raycaster
+      .intersectObjects(this.content.children, true)
+      .find(
+        (h) =>
+          (h.object as THREE.Mesh).isMesh &&
+          visibleInTree(h.object) &&
+          this.renderer.clippingPlanes.every((plane) => plane.distanceToPoint(h.point) >= -1e-4),
+      );
+    if (!hit) return null;
+    const data = hit.object.userData as PickableUserData & { ifcModel?: IfcModel };
+    const resolved = data.resolvePick?.(hit.faceIndex ?? 0) ?? null;
+    const normal = hit.face
+      ? hit.face.normal.clone().transformDirection(hit.object.matrixWorld).normalize()
+      : undefined;
+    if (normal && normal.dot(this.raycaster.ray.direction) > 0) normal.negate();
+    const screen = { x: event.clientX - rect.left, y: event.clientY - rect.top };
+    const base: PointPick = {
+      point: hit.point.clone(),
+      snap: 'face',
+      screen,
+      shift: event.shiftKey,
+      ...(normal ? { normal } : {}),
+      ...(resolved?.expressId !== undefined ? { expressId: resolved.expressId } : {}),
+      ...(resolved?.modelKey ? { modelKey: resolved.modelKey } : {}),
+    };
+    if (data.ifcModel && resolved?.expressId !== undefined) {
+      // The element under the pointer and its neighbours within the snap radius.
+      const worldPerPixel =
+        (2 * hit.distance * Math.tan(THREE.MathUtils.degToRad(this.camera.fov) / 2)) /
+        Math.max(rect.height, 1);
+      const near = data.ifcModel.idsNear(hit.point, worldPerPixel * 16);
+      const ids = [resolved.expressId, ...near.filter((id) => id !== resolved.expressId)];
+      const parts = ids.map((id) => data.ifcModel!.edgeSegmentsOf(id));
+      const segments = new Float32Array(parts.reduce((n, a) => n + a.length, 0));
+      let offset = 0;
+      for (const part of parts) {
+        segments.set(part, offset);
+        offset += part.length;
+      }
+      const project = (point: THREE.Vector3) => {
+        const v = point.clone().project(this.camera);
+        if (v.z > 1) return null;
+        return { x: ((v.x + 1) / 2) * rect.width, y: ((1 - v.y) / 2) * rect.height };
+      };
+      const snapped = snapToSegments(
+        screen,
+        this.raycaster.ray,
+        segments,
+        project,
+        this.snapOptions,
+      );
+      if (snapped) {
+        return {
+          ...base,
+          point: snapped.point,
+          snap: snapped.kind,
+          ...(snapped.edge ? { edge: snapped.edge } : {}),
+        };
+      }
+    }
+    return this.snapOptions.face ? base : null;
+  }
+
+  private readonly hoverStep = (): void => {
+    this.hoverFrame = 0;
+    const event = this.hoverEvent;
+    if (!event || this.pickMode !== 'point') return;
+    const pick = this.snapAt(event);
+    this.showSnap(pick);
+    this.onHoverPoint?.(pick);
+  };
+
   setPickMode(mode: PickMode): void {
     this.pickMode = mode;
+    if (mode !== 'point') {
+      this.showSnap(null);
+      this.setPreview(null);
+    }
     this.canvas.style.cursor =
       mode === 'point' ? 'crosshair' : this.navMode === 'walk' ? 'move' : '';
   }
@@ -457,6 +626,7 @@ export class SceneController implements ViewportHandle {
     window.removeEventListener('keyup', this.onKeyUp);
     cancelAnimationFrame(this.animation);
     cancelAnimationFrame(this.walkFrame);
+    cancelAnimationFrame(this.hoverFrame);
     this.gizmos.dispose();
     this.controls.removeEventListener('change', this.requestRender);
     this.controls.dispose();
@@ -470,12 +640,15 @@ export class SceneController implements ViewportHandle {
     this.frame = requestAnimationFrame(() => {
       this.frame = 0;
       this.renderer.render(this.scene, this.camera);
-      if (this.gizmos.scene.children.length > 0) {
-        // Plane handles are drawn on top without being cut by the planes themselves.
+      if (this.gizmos.scene.children.length > 0 || this.hud.children.length > 0) {
+        // Plane handles and snap markers are drawn on top, never cut by the planes.
         const planes = this.renderer.clippingPlanes;
         this.renderer.clippingPlanes = [];
         this.renderer.autoClear = false;
-        this.renderer.render(this.gizmos.scene, this.camera);
+        if (this.gizmos.scene.children.length > 0) {
+          this.renderer.render(this.gizmos.scene, this.camera);
+        }
+        if (this.hud.children.length > 0) this.renderer.render(this.hud, this.camera);
         this.renderer.autoClear = true;
         this.renderer.clippingPlanes = planes;
       }
@@ -637,6 +810,10 @@ export class SceneController implements ViewportHandle {
   };
 
   private readonly onPointerMove = (event: PointerEvent): void => {
+    if (this.pickMode === 'point' && !this.drag && event.buttons === 0) {
+      this.hoverEvent = event;
+      if (!this.hoverFrame) this.hoverFrame = requestAnimationFrame(this.hoverStep);
+    }
     if (this.look && this.navMode === 'walk') {
       const dx = event.clientX - this.look.x;
       const dy = event.clientY - this.look.y;
@@ -762,19 +939,8 @@ export class SceneController implements ViewportHandle {
     }
 
     if (this.pickMode === 'point') {
-      if (!hit) return;
-      const pickable = hit.object.userData as PickableUserData;
-      const resolved = pickable.resolvePick?.(hit.faceIndex ?? 0);
-      const normal = hit.face
-        ? hit.face.normal.clone().transformDirection(hit.object.matrixWorld).normalize()
-        : undefined;
-      // Faces are double-sided: make the normal face the camera.
-      if (normal && normal.dot(this.raycaster.ray.direction) > 0) normal.negate();
-      this.onPickPoint?.({
-        point: hit.point.clone(),
-        ...(normal ? { normal } : {}),
-        ...(resolved?.expressId !== undefined ? { expressId: resolved.expressId } : {}),
-      });
+      const pick = this.snapAt(event);
+      if (pick) this.onPickPoint?.(pick);
       return;
     }
 

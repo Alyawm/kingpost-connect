@@ -49,9 +49,22 @@ export {
   createLineObject,
   createMarkerObject,
   createMeasurementObject,
+  createAngleObject,
+  createPerpendicularObject,
+  createPointObject,
   formatDistance,
   measure,
   type Measurement,
 } from './measure';
 export { ViewCube } from './ViewCube';
 export { cubeTransform } from './cube';
+export {
+  DEFAULT_SNAP,
+  angleAt,
+  distanceToPlane,
+  orthoPoint,
+  snapToSegments,
+  type SnapKind,
+  type SnapOptions,
+  type SnapResult,
+} from './snap';

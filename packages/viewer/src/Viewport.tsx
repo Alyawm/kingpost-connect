@@ -16,6 +16,8 @@ export interface ViewportProps {
   onPickPoint?: (pick: PointPick) => void;
   /** Called while a section plane handle is dragged, with the plane's new point. */
   onClipPlaneMove?: (id: string, point: [number, number, number]) => void;
+  /** Called as the pointer moves in point-pick mode, with the snapped point or null. */
+  onHoverPoint?: (pick: PointPick | null) => void;
   /** Called when a section plane handle is clicked. */
   onClipPlaneSelect?: (id: string) => void;
   /** Called when a Shift+drag selection box is released. */
@@ -42,6 +44,7 @@ export function Viewport(props: ViewportProps) {
     const controller = new SceneController(canvas);
     controller.onPick = (hit, modifiers) => propsRef.current.onSelect?.(hit, modifiers);
     controller.onPickPoint = (pick) => propsRef.current.onPickPoint?.(pick);
+    controller.onHoverPoint = (pick) => propsRef.current.onHoverPoint?.(pick);
     controller.onClipPlaneMove = (id, point) => propsRef.current.onClipPlaneMove?.(id, point);
     controller.onClipPlaneSelect = (id) => propsRef.current.onClipPlaneSelect?.(id);
     controller.onBoxSelect = (rect, crossing, modifiers) =>

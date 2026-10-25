@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import type { PickResult } from '../scene';
-import { extractEdges } from './edges';
+import { elementEdges, extractEdges } from './edges';
 
 /** One element's slice of a merged mesh. */
 export interface ElementRange {
@@ -80,6 +80,7 @@ export class IfcModel {
       }
       bucket.mesh.userData = {
         ...bucket.mesh.userData,
+        ifcModel: this,
         managedSelection: true,
         resolvePick: (faceIndex: number): PickResult | null =>
           pickResult(this.expressIdAt(bucket, faceIndex), this.key),
@@ -219,6 +220,7 @@ export class IfcModel {
     mesh.scale.copy(bucket.mesh.scale);
     mesh.visible = false;
     mesh.userData = {
+      ifcModel: this,
       managedSelection: true,
       resolvePick: (faceIndex: number): PickResult | null =>
         pickResult(
@@ -463,6 +465,55 @@ export class IfcModel {
       if (inside) result.push(id);
     }
     return result;
+  }
+
+  /** Edge segments per element in world space, for snapping; filled on demand. */
+  private readonly segmentCache = new Map<number, Float32Array>();
+
+  /**
+   * An element's visible edges in world space (six numbers per segment), for snapping to
+   * corners, midpoints and edges.
+   */
+  edgeSegmentsOf(expressId: number): Float32Array {
+    const cached = this.segmentCache.get(expressId);
+    if (cached) return cached;
+    this.group.updateMatrixWorld(true);
+    const out: number[] = [];
+    const point = new THREE.Vector3();
+    for (const { bucket, range } of this.partsOf.get(expressId) ?? []) {
+      const full = this.fullIndex.get(bucket.mesh);
+      if (!full) continue;
+      const positions = bucket.mesh.geometry.getAttribute('position').array as ArrayLike<number>;
+      const local = elementEdges(positions, full, range);
+      for (let i = 0; i < local.length; i += 3) {
+        point.set(local[i]!, local[i + 1]!, local[i + 2]!).applyMatrix4(bucket.mesh.matrixWorld);
+        out.push(point.x, point.y, point.z);
+      }
+    }
+    const result = new Float32Array(out);
+    if (this.segmentCache.size > 500) this.segmentCache.clear();
+    this.segmentCache.set(expressId, result);
+    return result;
+  }
+
+  /**
+   * Visible elements whose bounds come within `radius` of a world point, nearest first:
+   * corners where elements meet can then snap to any of them.
+   */
+  idsNear(point: THREE.Vector3, radius: number, limit = 8): number[] {
+    const found: { id: number; d: number }[] = [];
+    for (const [id, b] of this.boxes()) {
+      if (this.hidden.has(id) || this.opacityOf(id) < INVISIBLE) continue;
+      const dx = Math.max(b[0]! - point.x, 0, point.x - b[3]!);
+      const dy = Math.max(b[1]! - point.y, 0, point.y - b[4]!);
+      const dz = Math.max(b[2]! - point.z, 0, point.z - b[5]!);
+      const d = Math.hypot(dx, dy, dz);
+      if (d <= radius) found.push({ id, d });
+    }
+    return found
+      .sort((a, b) => a.d - b.d)
+      .slice(0, limit)
+      .map((f) => f.id);
   }
 
   /** World-space bounds of the given elements, or null when none has geometry. */
