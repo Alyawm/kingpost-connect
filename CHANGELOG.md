@@ -3,6 +3,14 @@
 All notable changes to KingPost Connect. The format follows Keep a Changelog; versions
 follow semantic versioning. Milestone tags match the headings below.
 
+## [1.8.0] — 2026-10-25 — Filled sections and grids
+
+### Added
+- Filled section cuts: faces cut open by section planes or the section box are closed with
+  a solid fill; "Fill cut faces" switches it off (remembered between sessions).
+- Grid lines read from the IFC file (IfcGrid axes as polylines, lines or trimmed curves,
+  in any length unit), shown dashed with labelled bubbles from the toolbar.
+
 ## [1.7.0] — 2026-10-25 — Notes, links, units and section box
 
 ### Added

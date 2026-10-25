@@ -117,6 +117,14 @@ can be switched off, flipped to keep the other side, moved with a slider, or rem
 eye hides the plane handles. **+ Plan**, **+ X** and **+ Z** add planes through the model
 centre, and "Plan view of storey" places a cut just below a storey's top and looks down.
 Section planes are saved in views and in issue viewpoints (BCF).
+**Fill cut faces** (on by default, under the plane list) closes the cut: walls, slabs,
+beams and columns show a solid face where a plane passes through them instead of a hollow
+shell. It works with any number of planes, including the section box.
+
+**Grids.** The grid button in the toolbar shows the grid lines stored in the IFC file
+(IfcGrid), dashed, with a labelled bubble at each end. The lines follow the model in plan
+and in 3D. A model without grids says so in the log; in Revit, include grids in the IFC
+export settings.
 
 **Colours and transparency.** With elements selected, a bar at the bottom of the viewport
 shows how many are selected and their overall size (width × depth × height), and offers
