@@ -1,4 +1,4 @@
-import { Eraser, Eye, Focus, PenLine, Ruler } from 'lucide-react';
+import { Eraser, Eye, Focus, PenLine, Ruler, Scissors } from 'lucide-react';
 import type { ViewDirection } from '@kingpost/viewer';
 import { IconButton, cn } from '@kingpost/ui';
 import { useViewer } from '../state/viewer';
@@ -60,6 +60,19 @@ export function ViewportToolbar() {
             <Ruler size={14} />
           </IconButton>
           <IconButton
+            label={
+              tool === 'section'
+                ? 'Stop placing a section (Esc)'
+                : 'Place a section plane on a face'
+            }
+            size="sm"
+            active={tool === 'section'}
+            disabled={!handle}
+            onClick={() => setTool(tool === 'section' ? 'select' : 'section')}
+          >
+            <Scissors size={14} />
+          </IconButton>
+          <IconButton
             label={tool === 'markup' ? 'Stop drawing (Esc)' : 'Draw markup lines'}
             size="sm"
             active={tool === 'markup'}
@@ -92,9 +105,11 @@ export function ViewportToolbar() {
       </div>
       {tool !== 'select' && (
         <div className="pointer-events-none rounded-md border border-edge bg-surface/90 px-2 py-1 text-[11px] text-fg-muted shadow">
-          {pending
-            ? 'Click the second point'
-            : `Click the first point on the model${tool === 'markup' ? ' to draw a line' : ''}`}
+          {tool === 'section'
+            ? 'Click a face: the plane is placed on it, then drag its arrow to cut'
+            : pending
+              ? 'Click the second point'
+              : `Click the first point on the model${tool === 'markup' ? ' to draw a line' : ''}`}
         </div>
       )}
       {measurements.length > 0 && (

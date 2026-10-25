@@ -2,9 +2,11 @@ import { useCallback } from 'react';
 import {
   Viewport,
   createSampleFrame,
+  toThreePlane,
   type PickModifiers,
   type PickResult,
   type PointPick,
+  type ScreenRect,
   type ViewportHandle,
 } from '@kingpost/viewer';
 import { useViewer } from '../state/viewer';
@@ -52,6 +54,29 @@ export function Workspace() {
     useView.getState().pickPoint(pick);
   }, []);
 
+  const onClipPlaneMove = useCallback((id: string, point: [number, number, number]) => {
+    useView.getState().movePlane(id, point, true);
+  }, []);
+
+  const onClipPlaneSelect = useCallback((id: string) => {
+    useView.getState().setActivePlane(id);
+  }, []);
+
+  const onBoxSelect = useCallback(
+    (rect: ScreenRect, crossing: boolean, modifiers: PickModifiers) => {
+      const { model, selectedIds, selectMany } = useModel.getState();
+      const handle = useViewer.getState().handle;
+      if (!model || !handle) return;
+      const keep = useView
+        .getState()
+        .planes.filter((p) => p.enabled)
+        .map(toThreePlane);
+      const ids = model.idsInScreenRect(handle.getCameraObject(), rect, crossing, keep);
+      void selectMany(modifiers.ctrl ? [...selectedIds, ...ids] : ids);
+    },
+    [],
+  );
+
   const workspace = useUi((s) => s.workspace);
   const sheetOpen = useDrawings((s) => s.open !== null);
   const comparing = useDrawings((s) => s.compare !== null);
@@ -64,7 +89,14 @@ export function Workspace() {
       <div
         className={showSheet || showSchedule ? 'invisible absolute inset-0' : 'absolute inset-0'}
       >
-        <Viewport onReady={onReady} onSelect={onSelect} onPickPoint={onPickPoint} />
+        <Viewport
+          onReady={onReady}
+          onSelect={onSelect}
+          onPickPoint={onPickPoint}
+          onClipPlaneMove={onClipPlaneMove}
+          onClipPlaneSelect={onClipPlaneSelect}
+          onBoxSelect={onBoxSelect}
+        />
       </div>
       {showSheet && (comparing ? <SheetCompare /> : <SheetView />)}
       {showSchedule && <ScheduleView />}

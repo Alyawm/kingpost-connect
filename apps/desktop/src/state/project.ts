@@ -10,6 +10,8 @@ import {
   projectIsProject,
   projectOpen,
   projectSample,
+  projectAddFiles,
+  type AddedFile,
   type ImportSummary,
   type ProjectFile,
   type ProjectInfo,
@@ -30,6 +32,13 @@ interface ProjectState {
   openFolder(): Promise<void>;
   /** Opens a known folder without the picker (recent projects). */
   openPath(root: string): Promise<void>;
+  /** Opens a folder as a project, creating the project when the folder is plain. */
+  adoptFolder(root: string): Promise<boolean>;
+  /**
+   * Adds files dropped on the window: copies them into the project (the folder of the first
+   * file becomes the project when none is open), imports IFC files and shows the last one.
+   */
+  addDroppedFiles(paths: string[]): Promise<void>;
   /** Opens the bundled sample project, imports its model once and shows it. */
   openSample(): Promise<void>;
   close(): Promise<void>;
@@ -76,7 +85,10 @@ export const useProject = create<ProjectState>((set, get) => ({
       title: 'Choose a project folder',
     });
     if (!root) return;
+    await get().adoptFolder(root);
+  },
 
+  adoptFolder: async (root) => {
     set({ busy: true });
     try {
       const existing = await projectIsProject(root);
@@ -86,10 +98,58 @@ export const useProject = create<ProjectState>((set, get) => ({
       useUi.getState().rememberProject(info.root);
       log.info(`${existing ? 'Opened' : 'Created'} project "${info.name}" at ${info.root}`);
       await get().refreshFiles();
+      return true;
     } catch (error) {
       log.error(String(error));
+      return false;
     } finally {
       set({ busy: false });
+    }
+  },
+
+  addDroppedFiles: async (paths) => {
+    if (!isTauri() || paths.length === 0) return;
+    if (!get().current) {
+      const first = paths[0]!;
+      const folder = first.replace(/[\\/][^\\/]*$/, '');
+      log.info(`No project open: using ${folder} as the project folder.`);
+      if (!(await get().adoptFolder(folder))) return;
+    }
+    let results: Awaited<ReturnType<typeof projectAddFiles>>;
+    try {
+      results = await projectAddFiles(paths);
+    } catch (error) {
+      log.error(`Could not add the dropped files: ${String(error)}`);
+      return;
+    }
+    const added: AddedFile[] = [];
+    for (const result of results) {
+      if ('Err' in result) log.warn(result.Err);
+      else added.push(result.Ok);
+    }
+    await get().refreshFiles();
+    for (const file of added) {
+      const how = file.replaced
+        ? 'replaced'
+        : file.copied
+          ? 'copied into the project'
+          : 'already in the project';
+      log.info(`${file.rel_path}: ${how}`);
+    }
+    const models = added.filter((f) => f.kind === 'ifc');
+    for (const file of models) await get().importFile(file.rel_path);
+    const others = added.filter((f) => f.kind !== 'ifc');
+    if (others.length) {
+      log.info(
+        `${others.map((f) => f.rel_path).join(', ')}: import from the Drawings or Analysis section.`,
+      );
+    }
+    const last = models[models.length - 1];
+    const file = last ? get().files.find((f) => f.rel_path === last.rel_path) : undefined;
+    const revision = file?.revisions[file.revisions.length - 1];
+    if (file && revision) {
+      await useModel.getState().load(file.rel_path, revision);
+      useUi.setState({ section: 'viewer', leftOpen: true });
     }
   },
 

@@ -16,13 +16,15 @@ pub struct SavedViewRow {
     pub section_planes_json: String,
     pub has_thumbnail: bool,
     pub created_at: String,
+    /// Applied automatically when a model of the project is opened.
+    pub is_default: bool,
 }
 
 impl Store {
     pub fn saved_views(&self) -> Result<Vec<SavedViewRow>> {
         let mut statement = self.conn.prepare(
             "SELECT id, name, camera_json, visibility_json, section_planes_json,
-                    thumbnail IS NOT NULL, created_at
+                    thumbnail IS NOT NULL, created_at, is_default
              FROM saved_view ORDER BY created_at, name",
         )?;
         let rows = statement.query_map([], |row| {
@@ -34,6 +36,7 @@ impl Store {
                 section_planes_json: row.get(4)?,
                 has_thumbnail: row.get::<_, i64>(5)? != 0,
                 created_at: row.get(6)?,
+                is_default: row.get::<_, i64>(7)? != 0,
             })
         })?;
         Ok(rows.collect::<rusqlite::Result<_>>()?)
@@ -91,6 +94,15 @@ impl Store {
                 thumbnail
             ],
         )? > 0)
+    }
+
+    /// Makes one view the project default, or clears the default with `None`.
+    pub fn set_default_view(&self, id: Option<&str>) -> Result<()> {
+        self.conn.execute(
+            "UPDATE saved_view SET is_default = (id IS ?1 AND ?1 IS NOT NULL)",
+            [id],
+        )?;
+        Ok(())
     }
 
     pub fn rename_saved_view(&self, id: &str, name: &str) -> Result<bool> {
@@ -164,6 +176,21 @@ mod tests {
                 .update_saved_view("missing", "{}", "{}", "[]", None)
                 .unwrap()
         );
+
+        store.set_default_view(Some("v2")).unwrap();
+        let defaults: Vec<_> = store
+            .saved_views()
+            .unwrap()
+            .into_iter()
+            .filter(|v| v.is_default)
+            .map(|v| v.id)
+            .collect();
+        assert_eq!(defaults, vec!["v2".to_owned()]);
+        store.set_default_view(Some("v1")).unwrap();
+        assert!(store.saved_views().unwrap()[0].is_default);
+        assert!(!store.saved_views().unwrap()[1].is_default);
+        store.set_default_view(None).unwrap();
+        assert!(store.saved_views().unwrap().iter().all(|v| !v.is_default));
 
         assert!(store.rename_saved_view("v2", "Plan level 2").unwrap());
         assert!(store.delete_saved_view("v1").unwrap());

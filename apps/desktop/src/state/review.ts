@@ -233,22 +233,15 @@ export const useReview = create<ReviewState>((set, get) => ({
       );
     }
 
-    const plane = clipping[0];
-    if (plane) {
-      const normal = frame.directionFromIfc(plane.direction);
-      const location = frame.pointFromIfc(plane.location);
-      const axis = dominantAxis(normal);
-      if (axis) {
-        view.setSection({
-          enabled: true,
-          axis,
-          position: location[axis],
-          flip: normal[axis] < 0,
-        });
-      }
-    } else {
-      view.setSection({ enabled: false });
-    }
+    // BCF clipping planes point to the removed side, as ours do.
+    view.replacePlanes(
+      clipping.map((plane, index) => ({
+        id: `bcf-${viewpoint.id}-${index}`,
+        point: frame.pointFromIfc(plane.location).toArray() as Triple,
+        normal: frame.directionFromIfc(plane.direction).normalize().toArray() as Triple,
+        enabled: true,
+      })),
+    );
   },
 
   loadSnapshot: async (viewpointId) => {
@@ -353,14 +346,11 @@ export function captureViewpoint(): NewViewpointInput | null {
 
   const view = useView.getState();
   const clipping: ViewpointClipping[] = [];
-  if (view.section.enabled) {
-    const center = handle.contentBounds().getCenter(position.clone());
-    center[view.section.axis] = view.section.position;
-    const normal = new Vector3();
-    normal[view.section.axis] = view.section.flip ? -1 : 1; // points to the removed side
+  for (const plane of view.planes) {
+    if (!plane.enabled) continue;
     clipping.push({
-      location: frame.pointToIfc(center),
-      direction: frame.directionToIfc(normal),
+      location: frame.pointToIfc(vector(plane.point)),
+      direction: frame.directionToIfc(vector(plane.normal)), // points to the removed side
     });
   }
 
@@ -387,19 +377,6 @@ export function captureViewpoint(): NewViewpointInput | null {
     clipping,
     snapshot: handle.snapshot(640),
   };
-}
-
-type SectionAxisKey = 'x' | 'y' | 'z';
-
-function dominantAxis(v: { x: number; y: number; z: number }): SectionAxisKey | null {
-  const entries: [SectionAxisKey, number][] = [
-    ['x', Math.abs(v.x)],
-    ['y', Math.abs(v.y)],
-    ['z', Math.abs(v.z)],
-  ];
-  entries.sort((a, b) => b[1] - a[1]);
-  const [best, second] = entries;
-  return best && second && best[1] > 0.95 && second[1] < 0.2 ? best[0] : null;
 }
 
 function parse<T>(json: string): T | null {

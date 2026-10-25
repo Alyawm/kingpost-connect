@@ -10,6 +10,7 @@ import { StatusBar } from './StatusBar';
 import { CommandPalette } from './CommandPalette';
 import { SettingsDialog } from './SettingsDialog';
 import { HelpDialog } from './HelpDialog';
+import { DropZone } from './DropZone';
 
 /**
  * Window layout: activity rail · side panel · workspace (+ output below) · inspector,
@@ -52,6 +53,7 @@ export function AppShell() {
       <CommandPalette />
       <SettingsDialog />
       <HelpDialog />
+      <DropZone />
     </div>
   );
 }

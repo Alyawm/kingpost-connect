@@ -4,6 +4,10 @@ import {
   createLineObject,
   createMeasurementObject,
   measure,
+  planeOffset,
+  snapToAxis,
+  withOffset,
+  type ClipPlaneSpec,
   type Measurement,
   type PointPick,
 } from '@kingpost/viewer';
@@ -14,14 +18,16 @@ import { useViewer } from './viewer';
 
 export type SectionAxis = 'x' | 'y' | 'z';
 export type ColorBy = 'none' | 'type' | 'material' | 'storey' | 'status' | 'change' | 'link';
-export type Tool = 'select' | 'measure' | 'markup';
+export type Tool = 'select' | 'measure' | 'markup' | 'section';
 
-export interface Section {
+/** A section plane: viewer coordinates, normal pointing to the removed side. */
+export type ClipPlane = ClipPlaneSpec;
+
+/** The single-plane section stored by views saved before multiple planes existed. */
+interface LegacySection {
   enabled: boolean;
   axis: SectionAxis;
-  /** Position along the axis in world metres. */
   position: number;
-  /** false keeps the side below/behind the plane; true keeps the other side. */
   flip: boolean;
 }
 
@@ -41,7 +47,12 @@ export interface MarkupLine {
 
 interface ViewState {
   tool: Tool;
-  section: Section;
+  /** Section planes; every enabled one cuts, so several together make a section box. */
+  planes: ClipPlane[];
+  /** The plane being edited (highlighted, has the position slider). */
+  activePlaneId: string | null;
+  /** Whether plane handles are drawn in the viewport. */
+  showPlaneHandles: boolean;
   colorBy: ColorBy;
   legend: LegendEntry[];
   /** First point of a measurement or markup in progress, if any. */
@@ -54,7 +65,22 @@ interface ViewState {
   clearMarkups(): void;
   /** Draws lines (viewer coordinates) as markups, e.g. from an applied viewpoint. */
   addMarkups(lines: MarkupLine[]): void;
-  setSection(patch: Partial<Section>): void;
+  /** Adds a plane through a point; the normal points to the side that is cut away. */
+  addPlane(point: Triple, normal: Triple): void;
+  /** Adds an axis-aligned plane through the model's centre. */
+  addAxisPlane(axis: SectionAxis): void;
+  /** Moves a plane to a new point (from dragging its handle). */
+  movePlane(id: string, point: Triple, fromViewport?: boolean): void;
+  /** Moves a plane to an offset along its normal (from the slider). */
+  setPlaneOffset(id: string, offset: number): void;
+  flipPlane(id: string): void;
+  togglePlane(id: string): void;
+  removePlane(id: string): void;
+  clearPlanes(): void;
+  setActivePlane(id: string | null): void;
+  setShowPlaneHandles(show: boolean): void;
+  /** Replaces every plane at once (saved views, viewpoints). */
+  replacePlanes(planes: ClipPlane[]): void;
   /** Places a plan cut just below the top of a storey and looks down on it. */
   planOfStorey(storey: string): void;
   setColorBy(mode: ColorBy): void;
@@ -92,7 +118,45 @@ export const STAGE_COLORS: Record<Stage, string> = {
 
 const NO_STATUS = '— not set —';
 const UNCHANGED = 'unchanged';
-const defaultSection: Section = { enabled: false, axis: 'y', position: 0, flip: false };
+let planeCounter = 0;
+const newPlaneId = () => `plane-${Date.now().toString(36)}-${(planeCounter++).toString(36)}`;
+
+function applyPlanes(state: Pick<ViewState, 'planes' | 'activePlaneId' | 'showPlaneHandles'>) {
+  useViewer
+    .getState()
+    .handle?.setClipPlanes(state.planes, state.activePlaneId, state.showPlaneHandles);
+}
+
+/** A short name for a plane from its direction. */
+export function planeLabel(plane: ClipPlane): string {
+  const [x, y, z] = plane.normal.map((v) => Math.abs(v)) as Triple;
+  if (y > 0.999) return 'Horizontal';
+  if (x > 0.999) return 'Vertical X';
+  if (z > 0.999) return 'Vertical Z';
+  if (y < 0.001) return 'Vertical';
+  return 'Angled';
+}
+
+/**
+ * Section planes from a stored value: the current array form, or the single-plane object
+ * written by earlier versions (unflipped kept the lower side, so it removed +axis).
+ */
+export function planesFromStored(value: unknown): ClipPlane[] {
+  if (Array.isArray(value)) {
+    return value.filter(
+      (p): p is ClipPlane =>
+        !!p && Array.isArray(p.point) && Array.isArray(p.normal) && typeof p.id === 'string',
+    );
+  }
+  const legacy = value as Partial<LegacySection> | null;
+  if (!legacy || !legacy.enabled || !legacy.axis || typeof legacy.position !== 'number') return [];
+  const normal: Triple = [0, 0, 0];
+  const point: Triple = [0, 0, 0];
+  const index = { x: 0, y: 1, z: 2 }[legacy.axis];
+  normal[index] = legacy.flip ? -1 : 1;
+  point[index] = legacy.position;
+  return [{ id: newPlaneId(), point, normal, enabled: true }];
+}
 
 export const CHANGE_COLORS: Record<string, string> = {
   added: '#3ccf7a',
@@ -130,7 +194,9 @@ export function setLinkSource(source: () => ReadonlyMap<string, string>): void {
 
 export const useView = create<ViewState>((set, get) => ({
   tool: 'select',
-  section: defaultSection,
+  planes: [],
+  activePlaneId: null,
+  showPlaneHandles: true,
   colorBy: 'none',
   legend: [],
   pendingPoint: null,
@@ -144,6 +210,13 @@ export const useView = create<ViewState>((set, get) => ({
 
   pickPoint: (pick) => {
     const { pendingPoint, measurements, markups, tool } = get();
+    if (tool === 'section') {
+      // A plane on the clicked face, removing what is in front of it; drag it inwards to cut.
+      const normal = snapToAxis(pick.normal ?? new Vector3(0, 1, 0));
+      get().addPlane(pick.point.toArray() as Triple, normal.toArray() as Triple);
+      get().setTool('select');
+      return;
+    }
     if (!pendingPoint) {
       set({ pendingPoint: pick });
       return;
@@ -192,15 +265,70 @@ export const useView = create<ViewState>((set, get) => ({
     set({ markups: [...get().markups, ...lines] });
   },
 
-  setSection: (patch) => {
-    const section = { ...get().section, ...patch };
-    set({ section });
+  addPlane: (point, normal) => {
+    const plane: ClipPlane = { id: newPlaneId(), point, normal, enabled: true };
+    const next = { ...get(), planes: [...get().planes, plane], activePlaneId: plane.id };
+    set({ planes: next.planes, activePlaneId: plane.id });
+    applyPlanes(next);
+  },
+
+  addAxisPlane: (axis) => {
     const handle = useViewer.getState().handle;
-    handle?.setSection(
-      section.enabled
-        ? { axis: section.axis, position: section.position, flip: section.flip }
-        : null,
+    const center = handle?.contentBounds().getCenter(new Vector3()) ?? new Vector3();
+    const normal: Triple = [axis === 'x' ? 1 : 0, axis === 'y' ? 1 : 0, axis === 'z' ? 1 : 0];
+    get().addPlane(center.toArray() as Triple, normal);
+  },
+
+  movePlane: (id, point, fromViewport = false) => {
+    const planes = get().planes.map((p) => (p.id === id ? { ...p, point } : p));
+    set({ planes, activePlaneId: id });
+    // The viewport already shows a plane it is dragging; only redraw for other callers.
+    if (!fromViewport) applyPlanes({ ...get(), planes, activePlaneId: id });
+  },
+
+  setPlaneOffset: (id, offset) => {
+    const plane = get().planes.find((p) => p.id === id);
+    if (plane) get().movePlane(id, withOffset(plane, offset).point);
+  },
+
+  flipPlane: (id) => {
+    const planes = get().planes.map((p) =>
+      p.id === id ? { ...p, normal: p.normal.map((v) => (v === 0 ? 0 : -v)) as Triple } : p,
     );
+    set({ planes });
+    applyPlanes({ ...get(), planes });
+  },
+
+  togglePlane: (id) => {
+    const planes = get().planes.map((p) => (p.id === id ? { ...p, enabled: !p.enabled } : p));
+    set({ planes });
+    applyPlanes({ ...get(), planes });
+  },
+
+  removePlane: (id) => {
+    const planes = get().planes.filter((p) => p.id !== id);
+    const activePlaneId =
+      get().activePlaneId === id ? (planes[planes.length - 1]?.id ?? null) : get().activePlaneId;
+    set({ planes, activePlaneId });
+    applyPlanes({ ...get(), planes, activePlaneId });
+  },
+
+  clearPlanes: () => get().replacePlanes([]),
+
+  setActivePlane: (id) => {
+    set({ activePlaneId: id });
+    applyPlanes({ ...get(), activePlaneId: id });
+  },
+
+  setShowPlaneHandles: (show) => {
+    set({ showPlaneHandles: show });
+    applyPlanes({ ...get(), showPlaneHandles: show });
+  },
+
+  replacePlanes: (planes) => {
+    const activePlaneId = planes[planes.length - 1]?.id ?? null;
+    set({ planes, activePlaneId });
+    applyPlanes({ ...get(), planes, activePlaneId });
   },
 
   planOfStorey: (storey) => {
@@ -215,7 +343,10 @@ export const useView = create<ViewState>((set, get) => ({
     const height = box.max.y - box.min.y;
     // Cut a little below the top so columns read as cut sections and beams stay visible.
     const position = box.max.y - Math.min(0.4, height * 0.15);
-    get().setSection({ enabled: true, axis: 'y', position, flip: false });
+    const center = box.getCenter(new Vector3());
+    get().replacePlanes([
+      { id: newPlaneId(), point: [center.x, position, center.z], normal: [0, 1, 0], enabled: true },
+    ]);
     handle.fitTo(box, 'top');
   },
 
@@ -250,14 +381,15 @@ export const useView = create<ViewState>((set, get) => ({
     const handle = useViewer.getState().handle;
     set({
       tool: 'select',
-      section: defaultSection,
+      planes: [],
+      activePlaneId: null,
       colorBy: 'none',
       legend: [],
       pendingPoint: null,
       measurements: [],
       markups: [],
     });
-    handle?.setSection(null);
+    handle?.setClipPlanes([], null, get().showPlaneHandles);
     handle?.clearOverlay();
     handle?.setPickMode('select');
   },
@@ -344,3 +476,5 @@ export function buildLegend(
 export function sectionRange(axis: SectionAxis): { min: number; max: number } {
   return useViewer.getState().handle?.extent(axis) ?? { min: 0, max: 10 };
 }
+
+export { planeOffset };

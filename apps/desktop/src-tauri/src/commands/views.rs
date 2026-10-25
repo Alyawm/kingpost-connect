@@ -16,6 +16,7 @@ pub struct SavedView {
     /// JPEG as a data URL, when a thumbnail was stored.
     thumbnail: Option<String>,
     created_at: String,
+    is_default: bool,
 }
 
 fn data_url(bytes: &[u8]) -> String {
@@ -55,6 +56,7 @@ pub fn views_list(state: State<'_, AppState>) -> Result<Vec<SavedView>, String> 
                     section_planes_json: row.section_planes_json,
                     thumbnail,
                     created_at: row.created_at,
+                    is_default: row.is_default,
                 })
             })
             .collect()
@@ -103,6 +105,7 @@ pub fn view_save(
             section_planes_json: row.section_planes_json,
             thumbnail: bytes.as_deref().map(data_url),
             created_at: row.created_at,
+            is_default: row.is_default,
         })
     })
 }
@@ -128,6 +131,17 @@ pub fn view_update(
                 &section_planes_json,
                 bytes.as_deref(),
             )
+            .map_err(describe)
+    })
+}
+
+/// Makes a view the project's default look, or clears the default.
+#[tauri::command]
+pub fn view_set_default(state: State<'_, AppState>, id: Option<String>) -> Result<(), String> {
+    state.with_project(|project| {
+        project
+            .store()
+            .set_default_view(id.as_deref())
             .map_err(describe)
     })
 }

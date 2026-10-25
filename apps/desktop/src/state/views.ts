@@ -4,6 +4,7 @@ import {
   viewDelete,
   viewRename,
   viewSave,
+  viewSetDefault,
   viewUpdate,
   viewsList,
   type ElementSummary,
@@ -13,7 +14,7 @@ import { useAppearance, type Look } from './appearance';
 import { log } from './log';
 import { useModel } from './model';
 import { useProject } from './project';
-import { useView, type ColorBy, type Section } from './view';
+import { planesFromStored, useView, type ColorBy } from './view';
 import { useViewer } from './viewer';
 
 /** Elements sharing one colour/opacity override, by GlobalId. */
@@ -54,6 +55,8 @@ interface ViewsState {
   apply(view: SavedView): void;
   /** Everything visible, original colours, no section, whole model in view. */
   home(): void;
+  /** Makes a view the project default (applied when a model opens), or clears it. */
+  setDefault(id: string | null): Promise<void>;
   rename(id: string, name: string): Promise<void>;
   remove(id: string): Promise<void>;
 }
@@ -192,7 +195,7 @@ function capture(): {
   return {
     camera: JSON.stringify(handle.getCamera()),
     visibility: JSON.stringify(visibility),
-    section: JSON.stringify(view.section),
+    section: JSON.stringify(view.planes),
     thumbnail: handle.snapshot(320),
   };
 }
@@ -258,11 +261,11 @@ export const useViews = create<ViewsState>((set, get) => ({
     if (!handle) return;
     const camera = parse<CameraState>(view.camera_json);
     const visibility = parse<Visibility>(view.visibility_json);
-    const section = parse<Section>(view.section_planes_json);
+    const planes = planesFromStored(parse<unknown>(view.section_planes_json));
     const model = useModel.getState();
 
     if (camera) handle.setCamera(camera);
-    if (section) useView.getState().setSection(section);
+    useView.getState().replacePlanes(planes);
     set({ activeId: view.id });
 
     if (!visibility || !model.model) return;
@@ -294,9 +297,20 @@ export const useViews = create<ViewsState>((set, get) => ({
     model.showAll();
     useAppearance.getState().reset();
     useView.getState().setColorBy('none');
-    useView.getState().setSection({ enabled: false });
+    useView.getState().clearPlanes();
     handle?.viewFrom('iso');
     set({ activeId: null });
+  },
+
+  setDefault: async (id) => {
+    try {
+      await viewSetDefault(id);
+      const name = get().views.find((v) => v.id === id)?.name;
+      log.info(name ? `"${name}" opens with every model of this project` : 'No default view');
+      await get().refresh();
+    } catch (error) {
+      log.error(`Could not set the default view: ${String(error)}`);
+    }
   },
 
   rename: async (id, name) => {
@@ -333,4 +347,17 @@ useProject.subscribe((state, previous) => {
     useViews.setState({ activeId: null });
     void useViews.getState().refresh();
   }
+});
+
+// A newly loaded model opens with the project's default view, when one is set.
+useModel.subscribe((state, previous) => {
+  if (!state.model || state.model === previous.model) return;
+  void (async () => {
+    if (useViews.getState().views.length === 0) await useViews.getState().refresh();
+    const view = useViews.getState().views.find((v) => v.is_default);
+    if (view && useModel.getState().model === state.model) {
+      useViews.getState().apply(view);
+      log.info(`Applied the default view "${view.name}"`);
+    }
+  })();
 });

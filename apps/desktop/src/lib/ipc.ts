@@ -121,6 +121,19 @@ export function projectCreate(root: string, name: string): Promise<ProjectInfo> 
   return invoke<ProjectInfo>('project_create', { root, name });
 }
 
+/** A file brought into the project by drag and drop. */
+export interface AddedFile {
+  rel_path: string;
+  kind: FileKind;
+  copied: boolean;
+  replaced: boolean;
+}
+
+/** Copies dropped files into the open project; each entry is the file or an error. */
+export function projectAddFiles(paths: string[]): Promise<({ Ok: AddedFile } | { Err: string })[]> {
+  return invoke('project_add_files', { paths });
+}
+
 /** Opens (creating when needed) the sample project with the bundled sample model. */
 export function projectSample(): Promise<ProjectInfo> {
   return invoke<ProjectInfo>('project_sample');
@@ -185,6 +198,8 @@ export interface SavedView {
   /** JPEG data URL, when a thumbnail was stored. */
   thumbnail: string | null;
   created_at: string;
+  /** Applied automatically when a model of the project is opened. */
+  is_default: boolean;
 }
 
 export function viewsList(): Promise<SavedView[]> {
@@ -222,6 +237,10 @@ export function viewUpdate(
     sectionPlanesJson,
     thumbnail,
   });
+}
+
+export function viewSetDefault(id: string | null): Promise<void> {
+  return invoke<void>('view_set_default', { id });
 }
 
 export function viewRename(id: string, name: string): Promise<boolean> {
@@ -1082,7 +1101,8 @@ export function geometryCacheClear(): Promise<number> {
 export type ColumnKey =
   | { kind: 'field'; field: string }
   | { kind: 'property'; pset: string; name: string }
-  | { kind: 'derived'; quantity: 'length' | 'volume' | 'area' | 'mass' | 'count' | string };
+  | { kind: 'derived'; quantity: 'length' | 'volume' | 'area' | 'mass' | 'count' | string }
+  | { kind: 'formula'; expr: string };
 
 export type Aggregate = 'none' | 'sum' | 'count' | 'avg' | 'min' | 'max';
 
@@ -1131,6 +1151,8 @@ export interface ScheduleTable {
   rows: ScheduleRow[];
   element_count: number;
   missing_densities: string[];
+  /** Formula columns that could not be read, as "label: reason". */
+  formula_errors: string[];
 }
 
 export interface PresetRow {

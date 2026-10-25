@@ -253,9 +253,97 @@ pub fn search_elements(
     })
 }
 
+/// A file brought into the project by drag and drop.
+#[derive(Serialize, Debug, PartialEq)]
+pub struct AddedFile {
+    rel_path: String,
+    kind: &'static str,
+    /// False when the file was already inside the project folder and is used in place.
+    copied: bool,
+    /// True when a file of the same name was replaced (its next import is a new revision).
+    replaced: bool,
+}
+
+/// Puts one file into the project: used in place when it is already under the root,
+/// otherwise copied to the root, replacing a file of the same name.
+fn place_file(root: &Path, source: &Path) -> Result<AddedFile, String> {
+    let kind = kind_of(source)
+        .ok_or_else(|| format!("{} is not a file type the project uses", source.display()))?;
+    if !source.is_file() {
+        return Err(format!("{} is not a file", source.display()));
+    }
+    let canonical_root = fs::canonicalize(root).map_err(|e| format!("{}: {e}", root.display()))?;
+    let canonical = fs::canonicalize(source).map_err(|e| format!("{}: {e}", source.display()))?;
+    if let Ok(rel) = canonical.strip_prefix(&canonical_root) {
+        return Ok(AddedFile {
+            rel_path: rel.to_string_lossy().replace('\\', "/"),
+            kind,
+            copied: false,
+            replaced: false,
+        });
+    }
+    let name = source
+        .file_name()
+        .ok_or_else(|| format!("{} has no file name", source.display()))?;
+    let target = root.join(name);
+    let replaced = target.exists();
+    fs::copy(source, &target).map_err(|e| format!("{}: {e}", source.display()))?;
+    Ok(AddedFile {
+        rel_path: name.to_string_lossy().into_owned(),
+        kind,
+        copied: true,
+        replaced,
+    })
+}
+
+/// Brings dropped files into the open project; unsupported files are reported, not fatal.
+#[tauri::command]
+pub fn project_add_files(
+    state: State<'_, AppState>,
+    paths: Vec<String>,
+) -> Result<Vec<Result<AddedFile, String>>, String> {
+    state.with_project(|project| {
+        Ok(paths
+            .iter()
+            .map(|path| place_file(project.root(), Path::new(path)))
+            .collect())
+    })
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn places_dropped_files_in_the_project() {
+        let base = tempfile::tempdir().unwrap();
+        let root = base.path().join("project");
+        let outside = base.path().join("downloads");
+        fs::create_dir_all(root.join("models")).unwrap();
+        fs::create_dir_all(&outside).unwrap();
+        fs::write(outside.join("Tower.ifc"), b"one").unwrap();
+        fs::write(root.join("models").join("Inside.ifc"), b"x").unwrap();
+        fs::write(outside.join("notes.txt"), b"x").unwrap();
+
+        let added = place_file(&root, &outside.join("Tower.ifc")).unwrap();
+        assert_eq!(added.rel_path, "Tower.ifc");
+        assert!(added.copied && !added.replaced);
+        assert_eq!(fs::read(root.join("Tower.ifc")).unwrap(), b"one");
+
+        // A newer copy with the same name replaces the file.
+        fs::write(outside.join("Tower.ifc"), b"two").unwrap();
+        let again = place_file(&root, &outside.join("Tower.ifc")).unwrap();
+        assert!(again.replaced);
+        assert_eq!(fs::read(root.join("Tower.ifc")).unwrap(), b"two");
+
+        // Already inside: used in place.
+        let inside = place_file(&root, &root.join("models").join("Inside.ifc")).unwrap();
+        assert_eq!(inside.rel_path, "models/Inside.ifc");
+        assert!(!inside.copied);
+
+        assert!(place_file(&root, &outside.join("notes.txt")).is_err());
+        assert!(place_file(&root, &outside.join("missing.ifc")).is_err());
+    }
 
     #[test]
     fn rejects_paths_that_leave_the_project() {

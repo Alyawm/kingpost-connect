@@ -1,5 +1,15 @@
 import { useEffect, useState, type FormEvent, type ReactNode } from 'react';
-import { Camera, EyeOff, Home, Palette, Pencil, RefreshCw, Scissors, Trash2 } from 'lucide-react';
+import {
+  Camera,
+  EyeOff,
+  Home,
+  Palette,
+  Pencil,
+  RefreshCw,
+  Scissors,
+  Star,
+  Trash2,
+} from 'lucide-react';
 import { Button, cn } from '@kingpost/ui';
 import { useViews, type Visibility } from '../../state/views';
 import { useProject } from '../../state/project';
@@ -74,6 +84,7 @@ function ViewCard({ view, active, busy }: { view: SavedView; active: boolean; bu
   const update = useViews((s) => s.update);
   const rename = useViews((s) => s.rename);
   const remove = useViews((s) => s.remove);
+  const setDefault = useViews((s) => s.setDefault);
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState(view.name);
   const contents = describe(view);
@@ -104,6 +115,9 @@ function ViewCard({ view, active, busy }: { view: SavedView; active: boolean; bu
         )}
         {!editing && (
           <div className="flex items-center gap-1 px-1.5 py-1 text-[11px]">
+            {view.is_default && (
+              <Star size={10} className="shrink-0 fill-current text-accent" aria-label="Default" />
+            )}
             <span className="min-w-0 flex-1 truncate">{view.name}</span>
             {contents.looks && <Palette size={10} className="shrink-0 text-fg-muted" />}
             {contents.hidden && <EyeOff size={10} className="shrink-0 text-fg-muted" />}
@@ -135,6 +149,16 @@ function ViewCard({ view, active, busy }: { view: SavedView; active: boolean; bu
           onClick={() => void update(view.id)}
         >
           <RefreshCw size={12} />
+        </CardAction>
+        <CardAction
+          label={
+            view.is_default
+              ? 'Stop opening models with this view'
+              : 'Open every model of this project with this view'
+          }
+          onClick={() => void setDefault(view.is_default ? null : view.id)}
+        >
+          <Star size={12} className={view.is_default ? 'fill-current text-accent' : ''} />
         </CardAction>
         <CardAction label={`Rename "${view.name}"`} onClick={() => setEditing(true)}>
           <Pencil size={12} />
@@ -180,16 +204,18 @@ function CardAction({
 /** What a view changes, for the small icons on its card. */
 function describe(view: SavedView): { looks: boolean; hidden: boolean; section: boolean } {
   let visibility: Partial<Visibility> = {};
-  let section: { enabled?: boolean } = {};
+  let section: unknown = null;
   try {
     visibility = JSON.parse(view.visibility_json) as Partial<Visibility>;
-    section = JSON.parse(view.section_planes_json) as { enabled?: boolean };
+    section = JSON.parse(view.section_planes_json);
   } catch {
     // An unreadable payload shows no icons.
   }
   return {
     looks: (visibility.looks?.length ?? 0) > 0,
     hidden: (visibility.hidden?.length ?? 0) > 0,
-    section: section.enabled === true,
+    section: Array.isArray(section)
+      ? section.length > 0
+      : (section as { enabled?: boolean } | null)?.enabled === true,
   };
 }

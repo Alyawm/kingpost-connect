@@ -118,7 +118,8 @@ export function ViewerPanel() {
             Show sample frame
           </Button>
           <ul className="space-y-1 text-xs text-fg-muted">
-            <li>Left drag: orbit · Right drag: pan · Wheel: zoom</li>
+            <li>Left drag: orbit · Middle or right drag: pan · Wheel: zoom at the cursor</li>
+            <li>Shift+drag: box select (right to left also takes touching elements)</li>
             <li>Click: select · Double-click in tree: fit · F: fit model</li>
           </ul>
         </PanelBody>
