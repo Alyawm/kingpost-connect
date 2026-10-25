@@ -3,6 +3,7 @@ import { Panel, PanelBody, PanelHeader } from '@kingpost/ui';
 import { useViewer } from '../state/viewer';
 import { useModel } from '../state/model';
 import { useReview } from '../state/review';
+import { useFederation } from '../state/federation';
 import { sheetLabel, useDrawings } from '../state/drawings';
 import { STAGE_COLORS, type Stage } from '../state/view';
 import { formatIsoDate, formatQuantity } from '../lib/format';
@@ -19,12 +20,49 @@ export function Inspector() {
   const psets = useMemo(() => groupBySet(details?.properties ?? []), [details]);
   const onDrawings = useDrawings((s) => s.elementLinks);
   const openSheet = useDrawings((s) => s.openSheet);
+  const refPick = useFederation((s) => s.picked);
+  const refModel = useFederation((s) => s.refs.find((r) => r.key === s.picked?.key) ?? null);
+  const refPsets = useMemo(() => groupBySet(refPick?.details?.properties ?? []), [refPick]);
 
   return (
     <Panel>
       <PanelHeader title="Properties" />
       <PanelBody className="p-0">
-        {selectedId !== null ? (
+        {refPick && refModel ? (
+          <div>
+            <div className="border-b border-edge px-3 py-2">
+              <div className="text-sm font-semibold">
+                {refPick.summary?.name || refPick.summary?.tag || `#${refPick.expressId}`}
+              </div>
+              <div className="font-mono text-[11px] text-fg-muted">
+                {refPick.summary?.ifc_type ?? 'IfcProduct'} · #{refPick.expressId}
+              </div>
+              <div className="mt-1 text-[11px] text-fg-muted">
+                Reference model: {refModel.relPath} · rev {refModel.revision.idx}
+              </div>
+            </div>
+            <Section title="Element">
+              <Field label="Name" value={refPick.summary?.name} />
+              <Field label="Tag" value={refPick.summary?.tag} />
+              <Field label="Type" value={refPick.summary?.type_name} />
+              <Field label="Material" value={refPick.summary?.material} />
+              <Field label="Storey" value={refPick.summary?.storey} />
+              <Field label="GlobalId" value={refPick.summary?.global_id} mono />
+            </Section>
+            {refPsets.map(([pset, properties]) => (
+              <Section key={pset} title={pset}>
+                {properties.map((property) => (
+                  <Field
+                    key={property.name}
+                    label={property.name}
+                    value={formatValue(property)}
+                    mono={property.kind !== 'text'}
+                  />
+                ))}
+              </Section>
+            ))}
+          </div>
+        ) : selectedId !== null ? (
           <div>
             <div className="border-b border-edge px-3 py-2">
               <div className="text-sm font-semibold">

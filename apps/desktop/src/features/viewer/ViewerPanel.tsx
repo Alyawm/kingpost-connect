@@ -6,6 +6,7 @@ import { useViewer } from '../../state/viewer';
 import { useModel } from '../../state/model';
 import { useAppearance } from '../../state/appearance';
 import { ModelTree } from './ModelTree';
+import { ModelsSection } from './ModelsSection';
 import { GROUP_BY_LABELS, type GroupBy } from './tree';
 import { ViewTools } from './ViewTools';
 import { ViewsPanel } from './ViewsPanel';
@@ -91,6 +92,7 @@ export function ViewerPanel() {
               <p className="px-3 py-2 text-xs text-fg-muted">Loading…</p>
             ) : (
               <>
+                <ModelsSection />
                 <ViewTools />
                 <ViewsPanel />
                 <ModelTree filter={filter} groupBy={groupBy} />

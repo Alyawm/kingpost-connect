@@ -18,6 +18,7 @@ import { useView } from './state/view';
 import { useViewer } from './state/viewer';
 import { useViews } from './state/views';
 import { useHistory } from './state/history';
+import { useFederation } from './state/federation';
 import './styles.css';
 
 const container = document.getElementById('root');
@@ -43,6 +44,7 @@ if (import.meta.env.DEV) {
       useViewer,
       useViews,
       useHistory,
+      useFederation,
     },
   });
 }

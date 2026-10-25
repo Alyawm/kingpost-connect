@@ -13,6 +13,7 @@ import { useViewer } from '../state/viewer';
 import { useModel } from '../state/model';
 import { useView } from '../state/view';
 import { useAnalysis } from '../state/analysis';
+import { useFederation } from '../state/federation';
 import { useDrawings } from '../state/drawings';
 import { useUi } from '../state/ui';
 import { SheetView } from '../features/drawings/SheetView';
@@ -45,6 +46,13 @@ export function Workspace() {
         useAnalysis.getState().selectMember(hit.member);
         return;
       }
+      // An element of a reference model: show its properties; the main selection clears.
+      if (hit?.modelKey && hit.modelKey !== 'main' && hit.expressId !== undefined) {
+        void useModel.getState().select(null);
+        void useFederation.getState().pick(hit.modelKey, hit.expressId);
+        return;
+      }
+      void useFederation.getState().pick(null);
       useModel.getState().onPick(hit, modifiers);
     },
     [setSelection],

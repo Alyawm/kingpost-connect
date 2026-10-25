@@ -3,6 +3,7 @@ import { Box, Download, FileText, RefreshCw, Sheet, X } from 'lucide-react';
 import { Button, IconButton, Panel, PanelBody, PanelHeader, cn } from '@kingpost/ui';
 import { useProject } from '../../state/project';
 import { useModel } from '../../state/model';
+import { useFederation } from '../../state/federation';
 import { useUi } from '../../state/ui';
 import { GettingStarted, Welcome } from './Welcome';
 import { formatBytes, formatCount, formatIsoDate } from '../../lib/format';
@@ -142,7 +143,11 @@ function RevisionLine({
 }) {
   const load = useModel((s) => s.load);
   const loading = useModel((s) => s.loading);
+  const hasMain = useModel((s) => s.model !== null);
   const setSection = useUi((s) => s.setSection);
+  const addReference = useFederation((s) => s.add);
+  const adding = useFederation((s) => s.loading !== null);
+  const isReference = useFederation((s) => s.refs.some((r) => r.revision.id === revision.id));
 
   return (
     <li className="flex items-center gap-2 text-[11px]">
@@ -161,6 +166,20 @@ function RevisionLine({
       >
         {active ? 'Loaded' : 'Load'}
       </Button>
+      {hasMain && !active && (
+        <Button
+          size="sm"
+          variant="ghost"
+          className="h-6 px-1.5 text-[11px]"
+          disabled={loading || adding || isReference}
+          title="Show this model together with the main model"
+          onClick={() => {
+            void addReference(file.rel_path, revision).then(() => setSection('viewer'));
+          }}
+        >
+          {isReference ? 'In view' : '+ Add'}
+        </Button>
+      )}
     </li>
   );
 }

@@ -52,6 +52,26 @@ interface ModelState {
   fitTo(ids: Iterable<number>): void;
   /** GlobalIds of the selected elements, in selection order. */
   selectedGlobalIds(): string[];
+  /**
+   * Makes an already loaded model the main one without reloading it, and returns the
+   * previous main model (still in the scene, not disposed) for the caller to keep.
+   */
+  takeOver(next: LoadedModel): LoadedModel | null;
+}
+
+/** A model that is loaded in the viewer, main or reference. */
+export interface LoadedModel {
+  relPath: string;
+  revision: RevisionRow;
+  model: IfcModel;
+  frame: IfcFrame;
+  elements: ElementSummary[];
+}
+
+/** Scene objects that a new main model must not remove (reference models). */
+let keptObjects: () => IfcModel['group'][] = () => [];
+export function setKeptObjects(source: typeof keptObjects): void {
+  keptObjects = source;
 }
 
 /**
@@ -59,7 +79,7 @@ interface ModelState {
  * from web-ifc, in which case the result is cached for next time. The cache is keyed by
  * the file digest the revision was imported from, so a changed file never matches.
  */
-async function loadGeometry(
+export async function loadGeometry(
   relPath: string,
   revision: RevisionRow,
 ): Promise<{ model: IfcModel; frame: IfcFrame; triangles: number; source: string }> {
@@ -114,6 +134,8 @@ export const useModel = create<ModelState>((set, get) => ({
       log.error('The viewport is not ready');
       return;
     }
+    // Loading first, so listeners can tell a model switch from a close.
+    set({ loading: true });
     get().clear();
     // A pick on the start-up frame or a previous model must not linger in the inspector.
     useViewer.getState().setSelection(null);
@@ -123,7 +145,7 @@ export const useModel = create<ModelState>((set, get) => ({
       const started = performance.now();
       const elements = await revisionElements(revision.id);
       const { model, frame, triangles, source } = await loadGeometry(relPath, revision);
-      handle.clear();
+      handle.clear(keptObjects());
       handle.add(model.group);
       handle.fit();
       const byId = new Map(elements.map((e) => [e.express_id, e]));
@@ -219,6 +241,28 @@ export const useModel = create<ModelState>((set, get) => ({
   fitTo: (ids) => {
     const box = get().model?.boundsOf(ids);
     if (box) useViewer.getState().handle?.fitTo(box);
+  },
+
+  takeOver: (next) => {
+    const { model, frame, relPath, revision, elements } = get();
+    const previous =
+      model && frame && relPath && revision ? { model, frame, relPath, revision, elements } : null;
+    previous?.model.setSelected(null);
+    useViewer.getState().setSelection(null);
+    set({
+      model: next.model,
+      frame: next.frame,
+      relPath: next.relPath,
+      revision: next.revision,
+      elements: next.elements,
+      byId: new Map(next.elements.map((e) => [e.express_id, e])),
+      byGlobalId: new Map(next.elements.map((e) => [e.global_id, e.express_id])),
+      selectedIds: new Set(),
+      selectedId: null,
+      details: null,
+      hidden: new Set(next.model.hiddenIds),
+    });
+    return previous;
   },
 
   selectedGlobalIds: () => {

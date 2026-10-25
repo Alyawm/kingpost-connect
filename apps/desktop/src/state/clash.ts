@@ -15,6 +15,7 @@ import {
   type ClashTestRow,
   type ElementSummary,
 } from '../lib/ipc';
+import { useFederation } from './federation';
 import { log } from './log';
 import { useModel } from './model';
 import { useProject } from './project';
@@ -47,6 +48,8 @@ interface ClashState {
   captureSet(which: 'a' | 'b'): void;
   /** Captures every element with geometry that is not in set A. */
   captureRestAsB(): void;
+  /** Set B: every element with geometry in a reference model (clash between models). */
+  captureReferenceAsB(key: string): void;
   createTest(name: string, kind: ClashKind, clearance: number): Promise<void>;
   deleteTest(id: string): Promise<void>;
   selectTest(id: string | null): Promise<void>;
@@ -141,6 +144,14 @@ export const useClash = create<ClashState>((set, get) => ({
     log.info(`Set B: the other ${rest.length} element(s) with geometry`);
   },
 
+  captureReferenceAsB: (key) => {
+    const ref = useFederation.getState().refs.find((r) => r.key === key);
+    if (!ref) return;
+    const ids = ref.elements.filter((e) => e.has_geometry && !e.is_spatial).map((e) => e.global_id);
+    set({ setB: ids });
+    log.info(`Set B: all ${ids.length} element(s) of ${ref.relPath}`);
+  },
+
   createTest: async (name, kind, clearance) => {
     const { setA, setB } = get();
     if (!isTauri()) return;
@@ -184,8 +195,31 @@ export const useClash = create<ClashState>((set, get) => ({
       log.warn('Load a model revision before running a clash test.');
       return;
     }
+    // Elements are looked up in the main model first, then in each reference model, and
+    // addressed by one combined key: model slot × 2³² + express id.
+    const sources = [
+      { model: model.model, byGlobalId: model.byGlobalId, byId: model.byId },
+      ...useFederation.getState().refs.map((r) => ({
+        model: r.model,
+        byGlobalId: new Map(r.elements.map((e) => [e.global_id, e.express_id])),
+        byId: r.byId,
+      })),
+    ];
+    const SLOT = 2 ** 32;
+    const keyOf = (globalId: string): number | undefined => {
+      for (let slot = 0; slot < sources.length; slot++) {
+        const id = sources[slot]!.byGlobalId.get(globalId);
+        if (id !== undefined) return slot * SLOT + id;
+      }
+      return undefined;
+    };
     const resolve = (ids: string[]) =>
-      ids.map((g) => model.byGlobalId.get(g)).filter((id): id is number => id !== undefined);
+      ids.map(keyOf).filter((id): id is number => id !== undefined);
+    const combined = {
+      trianglesOf: (key: number) => sources[Math.floor(key / SLOT)]!.model.trianglesOf(key % SLOT),
+    };
+    const globalIdOf = (key: number) =>
+      sources[Math.floor(key / SLOT)]!.byId.get(key % SLOT)?.global_id ?? '';
     const a = resolve(test.set_a);
     const b = resolve(test.set_b);
     const missing = test.set_a.length + test.set_b.length - a.length - b.length;
@@ -199,7 +233,7 @@ export const useClash = create<ClashState>((set, get) => ({
     const started = performance.now();
     try {
       const hits: ClashHit[] = await findClashes(
-        model.model,
+        combined,
         a,
         b,
         { clearance: test.kind === 'clearance' ? test.clearance : 0, signal: abort.signal },
@@ -209,10 +243,9 @@ export const useClash = create<ClashState>((set, get) => ({
         log.warn('Clash test cancelled.');
         return;
       }
-      const byId = model.byId;
       const found: ClashFound[] = hits.map((h) => ({
-        a_global_id: byId.get(h.a)!.global_id,
-        b_global_id: byId.get(h.b)!.global_id,
+        a_global_id: globalIdOf(h.a),
+        b_global_id: globalIdOf(h.b),
         kind: h.kind,
         distance: h.distance,
         point: h.point,

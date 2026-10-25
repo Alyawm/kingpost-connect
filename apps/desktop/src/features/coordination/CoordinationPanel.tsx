@@ -18,6 +18,7 @@ import {
   type ClashFilter,
 } from '../../state/clash';
 import { useModel } from '../../state/model';
+import { useFederation } from '../../state/federation';
 import { useProject } from '../../state/project';
 import { CLASH_STATUSES, type ClashKind, type ClashRow } from '../../lib/ipc';
 
@@ -133,6 +134,8 @@ function NewTest() {
   const setB = useClash((s) => s.setB);
   const captureSet = useClash((s) => s.captureSet);
   const captureRestAsB = useClash((s) => s.captureRestAsB);
+  const captureReferenceAsB = useClash((s) => s.captureReferenceAsB);
+  const references = useFederation((s) => s.refs);
   const createTest = useClash((s) => s.createTest);
   const selectedCount = useModel((s) => s.selectedIds.size);
   const [name, setName] = useState('');
@@ -189,6 +192,17 @@ function NewTest() {
           >
             or set B = everything else with geometry
           </button>
+          {references.map((ref) => (
+            <button
+              key={ref.key}
+              type="button"
+              className={cn(subtle, 'block underline')}
+              title="Clash the main model's set A against another model"
+              onClick={() => captureReferenceAsB(ref.key)}
+            >
+              or set B = all of {ref.relPath} (rev {ref.revision.idx})
+            </button>
+          ))}
           <div className="grid grid-cols-[auto_1fr] items-center gap-x-2 gap-y-1">
             <span className={subtle}>Rule</span>
             <div className="flex gap-1">

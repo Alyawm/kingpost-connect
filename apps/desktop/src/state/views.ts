@@ -11,6 +11,7 @@ import {
   type SavedView,
 } from '../lib/ipc';
 import { useAppearance, type Look } from './appearance';
+import { useFederation } from './federation';
 import { log } from './log';
 import { useModel } from './model';
 import { useProject } from './project';
@@ -41,6 +42,16 @@ export interface Visibility {
   hiddenGlobalIds?: string[];
   shownGlobalIds?: string[];
   looks?: LookGroup[];
+  /** Reference models shown with the main model, and how. */
+  references?: StoredReference[];
+}
+
+export interface StoredReference {
+  revisionId: number;
+  relPath: string;
+  visible: boolean;
+  opacity: number;
+  color: string | null;
 }
 
 interface ViewsState {
@@ -197,6 +208,16 @@ function capture(): {
     looks: useAppearance.getState().looks,
     colorBy: view.colorBy,
   });
+  const references = useFederation.getState().refs;
+  if (references.length) {
+    visibility.references = references.map((r) => ({
+      revisionId: r.revision.id,
+      relPath: r.relPath,
+      visible: r.visible,
+      opacity: r.opacity,
+      color: r.color,
+    }));
+  }
   return {
     camera: JSON.stringify(handle.getCamera()),
     visibility: JSON.stringify(visibility),
@@ -313,6 +334,7 @@ export const useViews = create<ViewsState>((set, get) => ({
     if (resolved.hidden.length) model.hide(resolved.hidden);
     useAppearance.getState().replace(resolved.looks);
     useView.getState().setColorBy(visibility.colorBy);
+    if (visibility.references) void applyReferences(visibility.references);
     if (resolved.missing > 0) {
       log.warn(
         `View "${view.name}": ${resolved.missing.toLocaleString()} element(s) it refers to are not in this revision.`,
@@ -361,6 +383,34 @@ export const useViews = create<ViewsState>((set, get) => ({
     }
   },
 }));
+
+/**
+ * Brings the reference models to what a view recorded: missing ones are added, each gets
+ * its visibility, colour and fade, and loaded ones the view did not have are hidden.
+ */
+async function applyReferences(stored: StoredReference[]): Promise<void> {
+  const federation = useFederation.getState();
+  const files = useProject.getState().files;
+  for (const entry of stored) {
+    if (federation.refs.some((r) => r.revision.id === entry.revisionId)) continue;
+    if (useModel.getState().revision?.id === entry.revisionId) continue;
+    const revision = files
+      .flatMap((f) => f.revisions.map((r) => ({ file: f, revision: r })))
+      .find((x) => x.revision.id === entry.revisionId);
+    if (revision) await useFederation.getState().add(revision.file.rel_path, revision.revision);
+    else log.warn(`The view refers to ${entry.relPath}, which is no longer in the project.`);
+  }
+  const wanted = new Map(stored.map((e) => [e.revisionId, e]));
+  for (const ref of useFederation.getState().refs) {
+    const entry = wanted.get(ref.revision.id);
+    const f = useFederation.getState();
+    f.setVisible(ref.key, entry ? entry.visible : false);
+    if (entry) {
+      f.setOpacity(ref.key, entry.opacity);
+      f.setColor(ref.key, entry.color);
+    }
+  }
+}
 
 const PLAY_SECONDS = 3.5;
 let playTimer: ReturnType<typeof setInterval> | null = null;
