@@ -2,6 +2,7 @@ import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import type { AnalysisLayer } from './analysis';
 import { ClipGizmos, closestOnLine, toThreePlane, type ClipPlaneSpec } from './clip';
+import { SectionCaps } from './caps';
 import { createPreviewObject } from './measure';
 import { DEFAULT_SNAP, snapToSegments, type SnapKind, type SnapOptions } from './snap';
 import type { IfcModel } from './ifc/model';
@@ -98,6 +99,8 @@ export interface ViewportHandle {
   setSnapOptions(options: SnapOptions): void;
   /** A dashed preview polyline (for a measurement in progress); null removes it. */
   setPreview(points: THREE.Vector3[] | null): void;
+  /** Fills the faces cut open by section planes (on by default). */
+  setSectionCaps(on: boolean, color?: string): void;
   /** Removes one overlay object (a single measurement) and frees it. */
   removeOverlay(object: THREE.Object3D): void;
   select(object: THREE.Mesh | null): void;
@@ -158,6 +161,7 @@ export class SceneController implements ViewportHandle {
   onBoxSelect: ((rect: ScreenRect, crossing: boolean, modifiers: PickModifiers) => void) | null =
     null;
   private readonly gizmos = new ClipGizmos();
+  private readonly caps = new SectionCaps();
   private readonly cameraListeners = new Set<() => void>();
   /** Hover feedback for point picking: snap marker, snapped edge, preview line. */
   private readonly hud = new THREE.Scene();
@@ -207,8 +211,12 @@ export class SceneController implements ViewportHandle {
       // Snapshots read the canvas back after a render; without this WebView2 returns an
       // empty buffer. The cost is one extra copy per frame, which rendering on demand hides.
       preserveDrawingBuffer: true,
+      // Section caps are drawn through the stencil buffer.
+      stencil: true,
     });
     this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+    // Section caps clip each cap by the other planes through per-material planes.
+    this.renderer.localClippingEnabled = true;
 
     this.camera = new THREE.PerspectiveCamera(50, 1, 0.1, 5000);
     this.camera.position.set(18, 14, 22);
@@ -296,6 +304,27 @@ export class SceneController implements ViewportHandle {
       disposeTree(child);
     }
     this.requestRender();
+  }
+
+  setSectionCaps(on: boolean, color?: string): void {
+    this.caps.enabled = on;
+    if (color) this.caps.setColor(color);
+    this.requestRender();
+  }
+
+  /** The model, then the caps of any section planes. */
+  private drawModel(): void {
+    this.renderer.render(this.scene, this.camera);
+    if (this.renderer.clippingPlanes.length > 0) {
+      this.caps.render(
+        this.renderer,
+        this.scene,
+        this.content,
+        this.camera,
+        this.renderer.clippingPlanes,
+        new THREE.Box3().setFromObject(this.content),
+      );
+    }
   }
 
   setSnapOptions(options: SnapOptions): void {
@@ -525,7 +554,7 @@ export class SceneController implements ViewportHandle {
 
   snapshot(maxWidth = 320, format: 'jpeg' | 'png' = 'jpeg'): string {
     // Draw straight after rendering: the WebGL buffer stays readable until this task ends.
-    this.renderer.render(this.scene, this.camera);
+    this.drawModel();
     const scale = Math.min(1, maxWidth / Math.max(this.canvas.width, 1));
     const target = document.createElement('canvas');
     target.width = Math.max(1, Math.round(this.canvas.width * scale));
@@ -636,6 +665,7 @@ export class SceneController implements ViewportHandle {
     cancelAnimationFrame(this.walkFrame);
     cancelAnimationFrame(this.hoverFrame);
     this.gizmos.dispose();
+    this.caps.dispose();
     this.controls.removeEventListener('change', this.requestRender);
     this.controls.dispose();
     this.clear();
@@ -647,7 +677,7 @@ export class SceneController implements ViewportHandle {
     if (this.frame || this.disposed) return;
     this.frame = requestAnimationFrame(() => {
       this.frame = 0;
-      this.renderer.render(this.scene, this.camera);
+      this.drawModel();
       if (this.gizmos.scene.children.length > 0 || this.hud.children.length > 0) {
         // Plane handles and snap markers are drawn on top, never cut by the planes.
         const planes = this.renderer.clippingPlanes;

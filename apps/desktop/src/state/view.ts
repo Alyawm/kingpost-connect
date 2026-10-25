@@ -13,6 +13,7 @@ import type { ElementSummary, Triple } from '../lib/ipc';
 import { log } from './log';
 import { useMeasure } from './measure';
 import { useNotes } from './notes';
+import { useGrids } from './grids';
 import { useModel } from './model';
 import { useViewer } from './viewer';
 
@@ -57,6 +58,9 @@ interface ViewState {
   navMode: NavigationMode;
   /** Element edge lines on the model (remembered between sessions). */
   edges: boolean;
+  /** Section planes fill the faces they cut open (remembered between sessions). */
+  sectionFill: boolean;
+  setSectionFill(on: boolean): void;
   setNavMode(mode: NavigationMode): void;
   /** Left drag draws a selection box instead of orbiting. */
   boxSelect: boolean;
@@ -210,6 +214,7 @@ export const useView = create<ViewState>((set, get) => ({
   navMode: 'orbit',
   boxSelect: false,
   edges: loadEdges(),
+  sectionFill: loadFlag('kingpost.viewer.sectionFill', true),
   colorBy: 'none',
   legend: [],
   pendingPoint: null,
@@ -262,9 +267,10 @@ export const useView = create<ViewState>((set, get) => ({
   clearMarkups: () => {
     const handle = useViewer.getState().handle;
     handle?.clearOverlay();
-    // Measurements and notes share the overlay; draw them again.
+    // Measurements, notes and grids share the overlay; draw them again.
     useMeasure.getState().redraw();
     useNotes.getState().redraw();
+    useGrids.getState().redraw();
     set({ markups: [], pendingPoint: null });
   },
 
@@ -288,6 +294,16 @@ export const useView = create<ViewState>((set, get) => ({
     set({ boxSelect: on });
     if (on && get().tool !== 'select') get().setTool('select');
     useViewer.getState().handle?.setBoxSelect(on);
+  },
+
+  setSectionFill: (on) => {
+    set({ sectionFill: on });
+    try {
+      localStorage.setItem(FILL_KEY, on ? '1' : '0');
+    } catch {
+      // A setting that cannot be stored simply resets next time.
+    }
+    useViewer.getState().handle?.setSectionCaps(on);
   },
 
   setEdges: (on) => {
@@ -467,10 +483,21 @@ useModel.subscribe((state, previous) => {
   if (state.model !== previous.model) {
     useView.getState().reset();
     if (state.model && useView.getState().edges) void showEdges(true);
+    useViewer.getState().handle?.setSectionCaps(useView.getState().sectionFill);
   }
 });
 
 const EDGES_KEY = 'kingpost.viewer.edges';
+const FILL_KEY = 'kingpost.viewer.sectionFill';
+
+function loadFlag(key: string, fallback: boolean): boolean {
+  try {
+    const value = localStorage.getItem(key);
+    return value === null ? fallback : value !== '0';
+  } catch {
+    return fallback;
+  }
+}
 
 function loadEdges(): boolean {
   try {

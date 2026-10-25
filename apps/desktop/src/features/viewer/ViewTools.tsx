@@ -101,6 +101,8 @@ function SectionPlanes() {
   const remove = useView((s) => s.removePlane);
   const clear = useView((s) => s.clearPlanes);
   const setShowHandles = useView((s) => s.setShowPlaneHandles);
+  const sectionFill = useView((s) => s.sectionFill);
+  const setSectionFill = useView((s) => s.setSectionFill);
   const planOfStorey = useView((s) => s.planOfStorey);
   const elements = useModel((s) => s.elements);
   const handle = useViewer((s) => s.handle);
@@ -256,6 +258,17 @@ function SectionPlanes() {
             {formatLength(planeOffset(active), units)}
           </span>
         </div>
+      )}
+      {planes.length > 0 && (
+        <label className="mt-1.5 flex items-center gap-1.5 text-[11px] text-fg-muted">
+          <input
+            type="checkbox"
+            checked={sectionFill}
+            onChange={(e) => setSectionFill(e.target.checked)}
+            className="accent-[var(--kp-accent)]"
+          />
+          Fill cut faces
+        </label>
       )}
       {planes.length > 0 && (
         <p className="mt-1 text-[10px] text-fg-muted">
