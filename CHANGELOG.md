@@ -3,6 +3,22 @@
 All notable changes to KingPost Connect. The format follows Keep a Changelog; versions
 follow semantic versioning. Milestone tags match the headings below.
 
+## [1.2.0] — 2026-10-25 — Element appearance and views
+
+### Added
+- Colour and transparency per element: selection bar over the viewport with swatches, a
+  custom colour, a transparency slider and reset; hide (`H`), isolate (`I`), ghost
+  everything else (`G`), show all (`Shift+H`), clear selection (`Esc`).
+- Model tree: group by storey › type, type › type name or material › type; colour,
+  transparency and hide on every group and element row; select a whole group.
+- Saved views keep colours, transparency and hidden elements by GlobalId, so they apply to
+  later revisions; update a view with the current state, rename it inline, "Default view".
+
+### Changed
+- See-through elements are drawn by a companion mesh per material, sorted after opaque
+  geometry, so they blend correctly and stay pickable.
+- The geometry cache always stores every element, whatever is hidden when it is written.
+
 ## [1.1.2] — 2026-10-24 — Release build fix
 
 ### Fixed

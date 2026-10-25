@@ -30,7 +30,25 @@ to the selection. The model tree (Viewer section) lists storeys and types; isola
 show-all act on the selection. Section planes cut the model along an axis; "plan of
 storey" places a cut just below a storey's top and looks down. Colour the model by type,
 material, storey, design status, revision change or analysis link. Measure between two
-points; draw markup lines; save named views with a thumbnail.
+points; draw markup lines.
+
+**Colours and transparency.** With elements selected, a bar at the bottom of the viewport
+offers Appearance (colour swatches, a custom colour, a transparency slider), Hide (`H`),
+Isolate (`I`), Ghost everything else (`G`), fit and reset. `Shift+H` shows everything again
+and `Esc` clears the selection. A colour set here wins over "colour by"; the reset button
+in the Model panel header returns every element to its original look.
+
+**Model tree.** Group the tree by storey › type, type › type name, or material › type.
+Every group and element row has a colour and transparency button and an eye to hide or
+show it; a small swatch shows a group's colour. Double-click a group (or use "sel") to
+select all of its elements.
+
+**Views.** Save the current view by name: camera, section, colour-by mode, colours,
+transparency and hidden elements, with a thumbnail. Click a view to return to it. Hover a
+view to update it with what is on screen now, rename or delete it. Views remember elements
+by their IFC GlobalId, so a view saved on one revision also applies to the next; elements
+that no longer exist are reported in the output panel. "Default view" shows everything in
+its original colours without a section.
 
 ## Review
 
