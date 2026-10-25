@@ -2,6 +2,8 @@ import { create } from 'zustand';
 import type { CameraState } from '@kingpost/viewer';
 import {
   viewDelete,
+  imageSave,
+  isTauri,
   viewRename,
   viewSave,
   viewSetDefault,
@@ -52,6 +54,7 @@ export interface StoredReference {
   visible: boolean;
   opacity: number;
   color: string | null;
+  offset?: { x: number; y: number; z: number; rotation: number };
 }
 
 interface ViewsState {
@@ -69,6 +72,8 @@ interface ViewsState {
   /** Overwrites a view with what is on screen now. */
   update(id: string): Promise<void>;
   apply(view: SavedView): void;
+  /** Saves the current view as a full-resolution PNG chosen in a save dialog. */
+  exportImage(): Promise<void>;
   /** Everything visible, original colours, no section, whole model in view. */
   home(): void;
   /** Makes a view the project default (applied when a model opens), or clears it. */
@@ -216,6 +221,7 @@ function capture(): {
       visible: r.visible,
       opacity: r.opacity,
       color: r.color,
+      offset: r.offset,
     }));
   }
   return {
@@ -342,6 +348,25 @@ export const useViews = create<ViewsState>((set, get) => ({
     }
   },
 
+  exportImage: async () => {
+    const handle = useViewer.getState().handle;
+    if (!handle || !isTauri()) return;
+    const { save } = await import('@tauri-apps/plugin-dialog');
+    const model = useModel.getState().relPath?.replace(/\.[^.]+$/, '') ?? 'view';
+    const path = await save({
+      title: 'Export the view as an image',
+      defaultPath: `${model}-${new Date().toISOString().slice(0, 10)}.png`,
+      filters: [{ name: 'PNG image', extensions: ['png'] }],
+    });
+    if (!path) return;
+    try {
+      const bytes = await imageSave(path, handle.snapshot(100000, 'png'));
+      log.info(`Saved the view to ${path} (${Math.round(bytes / 1024)} KB)`);
+    } catch (error) {
+      log.error(`Could not save the image: ${String(error)}`);
+    }
+  },
+
   home: () => {
     const handle = useViewer.getState().handle;
     const model = useModel.getState();
@@ -408,6 +433,7 @@ async function applyReferences(stored: StoredReference[]): Promise<void> {
     if (entry) {
       f.setOpacity(ref.key, entry.opacity);
       f.setColor(ref.key, entry.color);
+      if (entry.offset) f.setPlacement(ref.key, entry.offset);
     }
   }
 }

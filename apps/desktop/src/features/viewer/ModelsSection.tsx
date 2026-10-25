@@ -67,6 +67,7 @@ function ReferenceRow({ model }: { model: ReferenceModel }) {
   const setVisible = useFederation((s) => s.setVisible);
   const setOpacity = useFederation((s) => s.setOpacity);
   const setColor = useFederation((s) => s.setColor);
+  const setPlacement = useFederation((s) => s.setPlacement);
   const fit = useFederation((s) => s.fit);
   const makeMain = useFederation((s) => s.makeMain);
   const remove = useFederation((s) => s.remove);
@@ -137,6 +138,37 @@ function ReferenceRow({ model }: { model: ReferenceModel }) {
                 onChange={(e) => setOpacity(model.key, 1 - Number(e.target.value) / 100)}
                 className="w-full accent-[var(--kp-accent)]"
               />
+            </div>
+            <div>
+              <div className="mb-1 flex justify-between text-[11px] text-fg-muted">
+                <span>Placement (IFC X, Y, Z in m; turn in °)</span>
+                {model.offset.x || model.offset.y || model.offset.z || model.offset.rotation ? (
+                  <button
+                    type="button"
+                    className="underline"
+                    onClick={() => setPlacement(model.key, { x: 0, y: 0, z: 0, rotation: 0 })}
+                  >
+                    reset
+                  </button>
+                ) : null}
+              </div>
+              <div className="grid grid-cols-4 gap-1">
+                {(['x', 'y', 'z', 'rotation'] as const).map((axis) => (
+                  <label key={axis} className="text-[10px] text-fg-muted">
+                    {axis === 'rotation' ? '↻' : axis.toUpperCase()}
+                    <input
+                      type="number"
+                      step={axis === 'rotation' ? 1 : 0.1}
+                      value={model.offset[axis]}
+                      aria-label={`Placement ${axis}`}
+                      onChange={(e) =>
+                        setPlacement(model.key, { [axis]: Number(e.target.value) || 0 })
+                      }
+                      className="h-6 w-full rounded border border-edge bg-canvas px-1 text-[11px] text-fg"
+                    />
+                  </label>
+                ))}
+              </div>
             </div>
           </div>
         </Popover>

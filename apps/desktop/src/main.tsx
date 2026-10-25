@@ -20,6 +20,7 @@ import { useViews } from './state/views';
 import { useHistory } from './state/history';
 import { useFederation } from './state/federation';
 import { useMeasure } from './state/measure';
+import { useNotes } from './state/notes';
 import './styles.css';
 
 const container = document.getElementById('root');
@@ -47,6 +48,7 @@ if (import.meta.env.DEV) {
       useHistory,
       useFederation,
       useMeasure,
+      useNotes,
     },
   });
 }

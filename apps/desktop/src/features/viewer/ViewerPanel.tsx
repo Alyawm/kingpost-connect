@@ -7,6 +7,7 @@ import { useModel } from '../../state/model';
 import { useAppearance } from '../../state/appearance';
 import { ModelTree } from './ModelTree';
 import { ModelsSection } from './ModelsSection';
+import { NotesSection } from './Notes';
 import { GROUP_BY_LABELS, type GroupBy } from './tree';
 import { ViewTools } from './ViewTools';
 import { ViewsPanel } from './ViewsPanel';
@@ -95,6 +96,7 @@ export function ViewerPanel() {
                 <ModelsSection />
                 <ViewTools />
                 <ViewsPanel />
+                <NotesSection />
                 <ModelTree filter={filter} groupBy={groupBy} />
               </>
             )}

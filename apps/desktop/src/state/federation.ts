@@ -1,5 +1,11 @@
 import { create } from 'zustand';
-import { IfcFrame, type ElementAppearance } from '@kingpost/viewer';
+import {
+  IfcFrame,
+  Matrix4,
+  Vector3,
+  type ElementAppearance,
+  type IfcModel,
+} from '@kingpost/viewer';
 import {
   elementDetails,
   revisionElements,
@@ -26,7 +32,20 @@ export interface ReferenceModel extends LoadedModel {
   opacity: number;
   /** One colour for the whole model, or null for its own colours. */
   color: string | null;
+  /** Manual placement on top of the IFC coordinates (metres, degrees about vertical). */
+  offset: Placement;
+  /** The model's centre in its own IFC coordinates; rotation turns about it. */
+  centre: [number, number, number];
 }
+
+export interface Placement {
+  x: number;
+  y: number;
+  z: number;
+  rotation: number;
+}
+
+export const NO_OFFSET: Placement = { x: 0, y: 0, z: 0, rotation: 0 };
 
 /** An element picked in a reference model, for the inspector. */
 export interface ReferencePick {
@@ -47,6 +66,8 @@ interface FederationState {
   setVisible(key: string, visible: boolean): void;
   setOpacity(key: string, opacity: number): void;
   setColor(key: string, color: string | null): void;
+  /** Moves or turns a reference model when its coordinates do not match the main one. */
+  setPlacement(key: string, patch: Partial<Placement>): void;
   fit(key: string): void;
   /** Swaps a reference model with the main model. */
   makeMain(key: string): void;
@@ -55,6 +76,20 @@ interface FederationState {
 }
 
 let counter = 0;
+
+/** A model's centre in its own IFC coordinates (its group must still be untransformed). */
+function centreOf(model: IfcModel, frame: IfcFrame): [number, number, number] {
+  const saved = model.group.matrix.clone();
+  model.group.position.set(0, 0, 0);
+  model.group.quaternion.identity();
+  model.group.scale.set(1, 1, 1);
+  model.group.updateMatrixWorld(true);
+  const box = model.boundsOf(model.expressIds);
+  saved.decompose(model.group.position, model.group.quaternion, model.group.scale);
+  model.group.updateMatrixWorld(true);
+  if (!box) return [0, 0, 0];
+  return frame.pointToIfc(box.getCenter(new Vector3()));
+}
 
 /** Places every reference model in the main model's viewer space. */
 function realign(refs: ReferenceModel[]): void {
@@ -66,13 +101,29 @@ function realign(refs: ReferenceModel[]): void {
     main.model.group.updateMatrixWorld(true);
   }
   for (const ref of refs) {
-    const matrix = main.frame ? IfcFrame.between(ref.frame, main.frame) : null;
+    const matrix = main.frame ? placementMatrix(ref, main.frame) : null;
     if (matrix) {
       matrix.decompose(ref.model.group.position, ref.model.group.quaternion, ref.model.group.scale);
     }
     ref.model.group.updateMatrixWorld(true);
   }
   useViewer.getState().handle?.render();
+}
+
+/**
+ * Reference viewer space → IFC (reference) → manual offset in IFC terms (turn about the
+ * model centre, then move) → main viewer space.
+ */
+function placementMatrix(ref: ReferenceModel, mainFrame: IfcFrame): Matrix4 {
+  const { x, y, z, rotation } = ref.offset;
+  if (!x && !y && !z && !rotation) return IfcFrame.between(ref.frame, mainFrame);
+  const [cx, cy, cz] = ref.centre;
+  const offset = new Matrix4()
+    .makeTranslation(x, y, z)
+    .multiply(new Matrix4().makeTranslation(cx, cy, cz))
+    .multiply(new Matrix4().makeRotationZ((rotation * Math.PI) / 180))
+    .multiply(new Matrix4().makeTranslation(-cx, -cy, -cz));
+  return mainFrame.matrixToViewer().multiply(offset).multiply(ref.frame.matrixToIfc());
 }
 
 /** Applies a reference model's whole-model colour and fade. */
@@ -134,6 +185,8 @@ export const useFederation = create<FederationState>((set, get) => {
           visible: true,
           opacity: 1,
           color: null,
+          offset: { ...NO_OFFSET },
+          centre: centreOf(model, frame),
         };
         handle.add(model.group);
         if (useView.getState().edges) void model.setEdgesVisible(true).then(() => handle.render());
@@ -182,6 +235,13 @@ export const useFederation = create<FederationState>((set, get) => {
       if (ref) applyLook(ref);
     },
 
+    setPlacement: (key, change) => {
+      const ref = get().refs.find((r) => r.key === key);
+      if (!ref) return;
+      patch(key, { offset: { ...ref.offset, ...change } });
+      realign(get().refs);
+    },
+
     fit: (key) => {
       const ref = get().refs.find((r) => r.key === key);
       const box = ref?.model.boundsOf(ref.model.expressIds);
@@ -212,6 +272,8 @@ export const useFederation = create<FederationState>((set, get) => {
             visible: true,
             opacity: 1,
             color: null,
+            offset: { ...NO_OFFSET },
+            centre: centreOf(previous.model, previous.frame),
           },
         ];
       }

@@ -1,5 +1,6 @@
 import { useMemo } from 'react';
 import {
+  BoxSelect,
   Eye,
   EyeOff,
   FlipVertical2,
@@ -12,6 +13,8 @@ import { extentAlong } from '@kingpost/viewer';
 import { Button, cn } from '@kingpost/ui';
 import { useModel } from '../../state/model';
 import { useViewer } from '../../state/viewer';
+import { useUi } from '../../state/ui';
+import { formatLength } from '../../lib/units';
 import { planeLabel, planeOffset, useView, type ColorBy } from '../../state/view';
 
 const colorModes: { value: ColorBy; label: string }[] = [
@@ -90,6 +93,7 @@ function SectionPlanes() {
   const activeId = useView((s) => s.activePlaneId);
   const showHandles = useView((s) => s.showPlaneHandles);
   const addAxisPlane = useView((s) => s.addAxisPlane);
+  const addSectionBox = useView((s) => s.addSectionBox);
   const setActive = useView((s) => s.setActivePlane);
   const setOffset = useView((s) => s.setPlaneOffset);
   const flip = useView((s) => s.flipPlane);
@@ -100,6 +104,7 @@ function SectionPlanes() {
   const planOfStorey = useView((s) => s.planOfStorey);
   const elements = useModel((s) => s.elements);
   const handle = useViewer((s) => s.handle);
+  const units = useUi((s) => s.units);
 
   const storeyNames = useMemo(
     () =>
@@ -159,6 +164,14 @@ function SectionPlanes() {
           <MousePointerClick size={12} />
           {placing ? 'Click a face…' : 'Place on face'}
         </Button>
+        <button
+          type="button"
+          className="flex items-center gap-0.5 rounded border border-edge px-1.5 py-0.5 text-fg-muted hover:bg-surface-2"
+          title="Six planes around the selection (or the whole model); drag a face to resize"
+          onClick={addSectionBox}
+        >
+          <BoxSelect size={11} /> Box
+        </button>
         {(['y', 'x', 'z'] as const).map((axis) => (
           <button
             key={axis}
@@ -240,7 +253,7 @@ function SectionPlanes() {
             aria-label="Plane position"
           />
           <span className="w-16 shrink-0 text-right font-mono text-[11px] text-fg-muted">
-            {planeOffset(active).toFixed(2)} m
+            {formatLength(planeOffset(active), units)}
           </span>
         </div>
       )}

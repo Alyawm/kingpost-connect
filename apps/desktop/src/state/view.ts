@@ -12,12 +12,13 @@ import {
 import type { ElementSummary, Triple } from '../lib/ipc';
 import { log } from './log';
 import { useMeasure } from './measure';
+import { useNotes } from './notes';
 import { useModel } from './model';
 import { useViewer } from './viewer';
 
 export type SectionAxis = 'x' | 'y' | 'z';
 export type ColorBy = 'none' | 'type' | 'material' | 'storey' | 'status' | 'change' | 'link';
-export type Tool = 'select' | 'measure' | 'markup' | 'section';
+export type Tool = 'select' | 'measure' | 'markup' | 'section' | 'note';
 
 /** A section plane: viewer coordinates, normal pointing to the removed side. */
 export type ClipPlane = ClipPlaneSpec;
@@ -76,6 +77,8 @@ interface ViewState {
   addPlane(point: Triple, normal: Triple): void;
   /** Adds an axis-aligned plane through the model's centre. */
   addAxisPlane(axis: SectionAxis): void;
+  /** Replaces the planes with a section box around the selection, or the whole model. */
+  addSectionBox(): void;
   /** Moves a plane to a new point (from dragging its handle). */
   movePlane(id: string, point: Triple, fromViewport?: boolean): void;
   /** Moves a plane to an offset along its normal (from the slider). */
@@ -224,6 +227,11 @@ export const useView = create<ViewState>((set, get) => ({
       useMeasure.getState().pick(pick);
       return;
     }
+    if (tool === 'note') {
+      useNotes.getState().startAt(pick);
+      get().setTool('select');
+      return;
+    }
     if (tool === 'section') {
       // A plane on the clicked face, removing what is in front of it; drag it inwards to cut.
       const normal = snapToAxis(pick.normal ?? new Vector3(0, 1, 0));
@@ -254,8 +262,9 @@ export const useView = create<ViewState>((set, get) => ({
   clearMarkups: () => {
     const handle = useViewer.getState().handle;
     handle?.clearOverlay();
-    // Measurements share the overlay; draw them again.
+    // Measurements and notes share the overlay; draw them again.
     useMeasure.getState().redraw();
+    useNotes.getState().redraw();
     set({ markups: [], pendingPoint: null });
   },
 
@@ -303,6 +312,38 @@ export const useView = create<ViewState>((set, get) => ({
     const center = handle?.contentBounds().getCenter(new Vector3()) ?? new Vector3();
     const normal: Triple = [axis === 'x' ? 1 : 0, axis === 'y' ? 1 : 0, axis === 'z' ? 1 : 0];
     get().addPlane(center.toArray() as Triple, normal);
+  },
+
+  addSectionBox: () => {
+    const handle = useViewer.getState().handle;
+    const { model, selectedIds } = useModel.getState();
+    const box =
+      (selectedIds.size && model?.boundsOf(selectedIds)) || handle?.contentBounds() || null;
+    if (!box) return;
+    const size = box.getSize(new Vector3());
+    const pad = Math.max(Math.max(size.x, size.y, size.z) * 0.02, 0.05);
+    const c = box.getCenter(new Vector3());
+    const planes: ClipPlane[] = [];
+    for (const [axis, i] of [
+      ['x', 0],
+      ['y', 1],
+      ['z', 2],
+    ] as const) {
+      for (const sign of [1, -1]) {
+        const normal: Triple = [0, 0, 0];
+        normal[i] = sign;
+        const point: Triple = [c.x, c.y, c.z];
+        point[i] = sign > 0 ? box.max[axis] + pad : box.min[axis] - pad;
+        planes.push({ id: newPlaneId(), point, normal, enabled: true });
+      }
+    }
+    get().replacePlanes(planes);
+    handle?.fitTo(box);
+    log.info(
+      selectedIds.size
+        ? `Section box around ${selectedIds.size} selected element(s); drag a face arrow to resize.`
+        : 'Section box around the model; drag a face arrow to resize.',
+    );
   },
 
   movePlane: (id, point, fromViewport = false) => {

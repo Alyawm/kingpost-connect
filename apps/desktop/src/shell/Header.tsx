@@ -1,5 +1,6 @@
 import { useMemo, useRef, type ReactNode } from 'react';
 import {
+  Box,
   Camera,
   CircleHelp,
   ClipboardPlus,
@@ -10,6 +11,7 @@ import {
   Footprints,
   Ghost,
   Hand,
+  ImageDown,
   LayoutGrid,
   Maximize,
   Maximize2,
@@ -26,6 +28,7 @@ import {
   Settings,
   SquareDashed,
   SquareDashedMousePointer,
+  StickyNote,
   Sun,
   Undo2,
 } from 'lucide-react';
@@ -167,6 +170,7 @@ export function MainToolbar() {
   const setEdges = useView((s) => s.setEdges);
   const planes = useView((s) => s.planes.length);
   const clearPlanes = useView((s) => s.clearPlanes);
+  const addSectionBox = useView((s) => s.addSectionBox);
   const markups = useView((s) => s.markups.length);
   const clearMarkups = useView((s) => s.clearMarkups);
   const measureCount = useMeasure((s) => s.records.length);
@@ -176,6 +180,7 @@ export function MainToolbar() {
   const undo = useHistory((s) => s.undo);
   const redo = useHistory((s) => s.redo);
   const saveView = useViews((s) => s.save);
+  const exportImage = useViews((s) => s.exportImage);
   const viewCount = useViews((s) => s.views.length);
   const requestNewIssue = useReview((s) => s.requestNewIssue);
   const leftOpen = useUi((s) => s.leftOpen);
@@ -316,6 +321,13 @@ export function MainToolbar() {
           <Scissors size={ICON} />
         </IconButton>
         <IconButton
+          label="Section box around the selection (or the model)"
+          disabled={disabled}
+          onClick={addSectionBox}
+        >
+          <Box size={ICON} />
+        </IconButton>
+        <IconButton
           label={tool === 'markup' ? 'Stop drawing (Esc)' : 'Markup lines'}
           active={tool === 'markup'}
           disabled={disabled}
@@ -337,6 +349,16 @@ export function MainToolbar() {
       </Group>
       <Group>
         <IconButton
+          label={
+            tool === 'note' ? 'Stop placing a note (Esc)' : 'Note: click the model to pin a note'
+          }
+          active={tool === 'note'}
+          disabled={disabled}
+          onClick={() => pickTool('note')}
+        >
+          <StickyNote size={ICON} />
+        </IconButton>
+        <IconButton
           label="New issue from the selection and current view"
           disabled={!hasModel}
           onClick={requestNewIssue}
@@ -349,6 +371,13 @@ export function MainToolbar() {
           onClick={() => void saveView(`View ${viewCount + 1}`)}
         >
           <Camera size={ICON} />
+        </IconButton>
+        <IconButton
+          label="Export the view as an image (PNG)"
+          disabled={!hasModel}
+          onClick={() => void exportImage()}
+        >
+          <ImageDown size={ICON} />
         </IconButton>
       </Group>
       <Group>

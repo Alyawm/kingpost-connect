@@ -1254,3 +1254,74 @@ export function densitySet(
 export function densityRemove(material: string): Promise<DensityRow[]> {
   return invoke<DensityRow[]>('density_remove', { material });
 }
+
+// ---- Notes in the model, links on elements, view images ----
+
+export interface NoteRow {
+  id: string;
+  global_id: string | null;
+  /** [x, y, z] in IFC world coordinates, as JSON. */
+  point_json: string;
+  text: string;
+  author: string;
+  created_at: string;
+}
+
+export interface ElementLinkRow {
+  id: string;
+  global_id: string;
+  kind: 'url' | 'file';
+  target: string;
+  label: string;
+  created_at: string;
+}
+
+export function notesList(): Promise<NoteRow[]> {
+  if (!isTauri()) return Promise.resolve([]);
+  return invoke<NoteRow[]>('notes_list');
+}
+
+export function noteAdd(
+  globalId: string | null,
+  point: Triple,
+  text: string,
+  author: string,
+): Promise<NoteRow[]> {
+  return invoke<NoteRow[]>('note_add', { globalId, point, text, author });
+}
+
+export function noteUpdate(id: string, text: string): Promise<NoteRow[]> {
+  return invoke<NoteRow[]>('note_update', { id, text });
+}
+
+export function noteDelete(id: string): Promise<NoteRow[]> {
+  return invoke<NoteRow[]>('note_delete', { id });
+}
+
+export function elementLinks(globalId: string | null): Promise<ElementLinkRow[]> {
+  if (!isTauri()) return Promise.resolve([]);
+  return invoke<ElementLinkRow[]>('element_links', { globalId });
+}
+
+export function elementLinkAdd(
+  globalId: string,
+  kind: 'url' | 'file',
+  target: string,
+  label: string,
+): Promise<ElementLinkRow[]> {
+  return invoke<ElementLinkRow[]>('element_link_add', { globalId, kind, target, label });
+}
+
+export function elementLinkDelete(id: string): Promise<boolean> {
+  return invoke<boolean>('element_link_delete', { id });
+}
+
+/** Opens a web link in the browser or a file in its application. */
+export function linkOpen(kind: 'url' | 'file', target: string): Promise<void> {
+  return invoke<void>('link_open', { kind, target });
+}
+
+/** Writes an image (data URL) to a path chosen in a save dialog. */
+export function imageSave(path: string, data: string): Promise<number> {
+  return invoke<number>('image_save', { path, data });
+}

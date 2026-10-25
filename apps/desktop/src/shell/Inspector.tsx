@@ -4,6 +4,7 @@ import { useViewer } from '../state/viewer';
 import { useModel } from '../state/model';
 import { useReview } from '../state/review';
 import { useFederation } from '../state/federation';
+import { LinksSection } from '../features/viewer/Links';
 import { sheetLabel, useDrawings } from '../state/drawings';
 import { STAGE_COLORS, type Stage } from '../state/view';
 import { formatIsoDate, formatQuantity } from '../lib/format';
@@ -85,6 +86,7 @@ export function Inspector() {
                 </div>
               )}
             </div>
+            {summary && <LinksSection globalId={summary.global_id} />}
             <Section title="Element">
               <Field label="Name" value={summary?.name} />
               <Field label="Tag" value={summary?.tag} />
