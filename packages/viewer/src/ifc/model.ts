@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import type { PickResult } from '../scene';
+import { extractEdges } from './edges';
 
 /** One element's slice of a merged mesh. */
 export interface ElementRange {
@@ -46,6 +47,18 @@ export class IfcModel {
   private readonly overrideOpacity = new Map<number, number>();
   /** Companion meshes that draw a bucket's see-through elements, created on first use. */
   private readonly translucent = new Map<MeshBucket, THREE.Mesh>();
+  /** Edge lines per bucket, built on first request. */
+  private readonly edgeLines = new Map<
+    MeshBucket,
+    {
+      lines: THREE.LineSegments;
+      full: Uint32Array;
+      ranges: { expressId: number; start: number; count: number }[];
+    }
+  >();
+  private edgesState: 'none' | 'building' | 'ready' = 'none';
+  private edgesVisible = false;
+  private disposed = false;
 
   constructor(group: THREE.Group, buckets: MeshBucket[]) {
     this.group = group;
@@ -192,6 +205,9 @@ export class IfcModel {
       transparent: true,
       depthWrite: false,
       side: THREE.DoubleSide,
+      polygonOffset: this.edgesVisible,
+      polygonOffsetFactor: 1,
+      polygonOffsetUnits: 1,
     });
     const mesh = new THREE.Mesh(geometry, material);
     mesh.name = `${bucket.mesh.name} (see-through)`;
@@ -464,7 +480,94 @@ export class IfcModel {
     return any ? box : null;
   }
 
+  /**
+   * Shows or hides element edge lines. The first request builds them (a second or so for
+   * a large model, without blocking the interface); the promise resolves when drawn.
+   */
+  async setEdgesVisible(visible: boolean): Promise<void> {
+    this.edgesVisible = visible;
+    if (visible && this.edgesState === 'none') await this.buildEdges();
+    if (this.disposed) return;
+    for (const { lines } of this.edgeLines.values()) lines.visible = this.edgesVisible;
+    // Push faces back a little so the lines on their borders win the depth test.
+    const materials = [
+      ...this.buckets.map((b) => b.mesh.material),
+      ...[...this.translucent.values()].map((m) => m.material),
+    ].flat() as THREE.Material[];
+    for (const material of materials) {
+      if (material.polygonOffset === this.edgesVisible) continue;
+      material.polygonOffset = this.edgesVisible;
+      material.polygonOffsetFactor = 1;
+      material.polygonOffsetUnits = 1;
+      material.needsUpdate = true;
+    }
+  }
+
+  get edgesShown(): boolean {
+    return this.edgesVisible && this.edgesState === 'ready';
+  }
+
+  private async buildEdges(): Promise<void> {
+    this.edgesState = 'building';
+    for (const bucket of this.buckets) {
+      const full = this.fullIndex.get(bucket.mesh);
+      if (!full) continue;
+      const positions = bucket.mesh.geometry.getAttribute('position').array as ArrayLike<number>;
+      const set = await extractEdges(positions, full, bucket.ranges, 30, () => this.disposed);
+      if (!set || this.disposed) return;
+      if (set.positions.length === 0) continue;
+      const geometry = new THREE.BufferGeometry();
+      geometry.setAttribute('position', new THREE.BufferAttribute(set.positions, 3));
+      const count = set.positions.length / 3;
+      const all = new Uint32Array(count);
+      for (let i = 0; i < count; i++) all[i] = i;
+      geometry.setIndex(new THREE.BufferAttribute(all, 1));
+      const lines = new THREE.LineSegments(
+        geometry,
+        new THREE.LineBasicMaterial({ color: 0x15181d, transparent: true, opacity: 0.5 }),
+      );
+      lines.name = `${bucket.mesh.name} (edges)`;
+      lines.position.copy(bucket.mesh.position);
+      lines.quaternion.copy(bucket.mesh.quaternion);
+      lines.scale.copy(bucket.mesh.scale);
+      // Edges are drawing aids: never picked, never part of selection.
+      lines.raycast = () => {};
+      lines.visible = this.edgesVisible;
+      this.group.add(lines);
+      this.edgeLines.set(bucket, { lines, full: all, ranges: set.ranges });
+    }
+    this.edgesState = 'ready';
+    this.rebuildEdgeIndices();
+  }
+
+  /** Edges follow their elements: none for hidden or mostly transparent ones. */
+  private rebuildEdgeIndices(): void {
+    for (const { lines, full, ranges } of this.edgeLines.values()) {
+      const drawn = (id: number) => !this.hidden.has(id) && this.opacityOf(id) >= 0.5;
+      if (ranges.every((r) => drawn(r.expressId))) {
+        lines.geometry.setIndex(new THREE.BufferAttribute(full, 1));
+        continue;
+      }
+      let total = 0;
+      for (const r of ranges) if (drawn(r.expressId)) total += r.count;
+      const out = new Uint32Array(total);
+      let cursor = 0;
+      for (const r of ranges) {
+        if (!drawn(r.expressId)) continue;
+        out.set(full.subarray(r.start, r.start + r.count), cursor);
+        cursor += r.count;
+      }
+      lines.geometry.setIndex(new THREE.BufferAttribute(out, 1));
+    }
+  }
+
   dispose(): void {
+    this.disposed = true;
+    for (const { lines } of this.edgeLines.values()) {
+      lines.geometry.dispose();
+      (lines.material as THREE.Material).dispose();
+    }
+    this.edgeLines.clear();
     for (const mesh of this.translucent.values()) {
       // Positions and normals belong to the bucket mesh and are released with it.
       mesh.geometry.dispose();
@@ -544,6 +647,7 @@ export class IfcModel {
         mesh.visible = seeThrough.length > 0;
       }
     }
+    this.rebuildEdgeIndices();
   }
 
   private collect(

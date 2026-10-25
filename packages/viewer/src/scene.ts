@@ -12,7 +12,10 @@ export interface PickResult {
   member?: string;
 }
 
-export type ViewDirection = 'iso' | 'top' | 'front' | 'back' | 'left' | 'right';
+export type ViewDirection = 'iso' | 'top' | 'bottom' | 'front' | 'back' | 'left' | 'right';
+
+/** What a left-button drag does: orbit around the target, pan, or look around (walk). */
+export type NavigationMode = 'orbit' | 'pan' | 'walk';
 
 export type PickMode = 'select' | 'point';
 
@@ -56,7 +59,11 @@ export interface ViewportHandle {
   setAnalysisLayer(layer: AnalysisLayer | null): void;
   setPickMode(mode: PickMode): void;
   getCamera(): CameraState;
-  setCamera(state: CameraState): void;
+  /** Moves the camera, animated unless `animate` is false. */
+  setCamera(state: CameraState, animate?: boolean): void;
+  setNavigationMode(mode: NavigationMode): void;
+  /** Called after every frame in which the camera may have moved; returns an unsubscribe. */
+  onCameraChange(listener: () => void): () => void;
   /** Renders a frame and returns it as a JPEG data URL no wider than `maxWidth`. */
   snapshot(maxWidth?: number): string;
   fit(): void;
@@ -76,6 +83,7 @@ export interface ViewportHandle {
 const VIEW_DIRECTIONS: Record<ViewDirection, THREE.Vector3> = {
   iso: new THREE.Vector3(1, 0.8, 1.2),
   top: new THREE.Vector3(0, 1, 0.0001),
+  bottom: new THREE.Vector3(0, -1, 0.0001),
   front: new THREE.Vector3(0, 0, 1),
   back: new THREE.Vector3(0, 0, -1),
   left: new THREE.Vector3(-1, 0, 0),
@@ -119,6 +127,13 @@ export class SceneController implements ViewportHandle {
   onBoxSelect: ((rect: ScreenRect, crossing: boolean, modifiers: PickModifiers) => void) | null =
     null;
   private readonly gizmos = new ClipGizmos();
+  private readonly cameraListeners = new Set<() => void>();
+  private animation = 0;
+  private navMode: NavigationMode = 'orbit';
+  private look: { x: number; y: number } | null = null;
+  private readonly keys = new Set<string>();
+  private walkFrame = 0;
+  private walkLast = 0;
   private clipPlanes: ClipPlaneSpec[] = [];
   private activeClipId: string | null = null;
   private showClipHandles = true;
@@ -198,6 +213,9 @@ export class SceneController implements ViewportHandle {
     canvas.addEventListener('pointerdown', this.onPointerDown, { capture: true });
     canvas.addEventListener('pointermove', this.onPointerMove);
     canvas.addEventListener('pointerup', this.onPointerUp);
+    canvas.addEventListener('wheel', this.onWheel, { passive: false });
+    window.addEventListener('keydown', this.onKeyDown);
+    window.addEventListener('keyup', this.onKeyUp);
 
     this.resize();
   }
@@ -242,7 +260,8 @@ export class SceneController implements ViewportHandle {
 
   setPickMode(mode: PickMode): void {
     this.pickMode = mode;
-    this.canvas.style.cursor = mode === 'point' ? 'crosshair' : '';
+    this.canvas.style.cursor =
+      mode === 'point' ? 'crosshair' : this.navMode === 'walk' ? 'move' : '';
   }
 
   getCamera(): CameraState {
@@ -252,15 +271,76 @@ export class SceneController implements ViewportHandle {
     };
   }
 
-  setCamera(state: CameraState): void {
-    this.camera.position.fromArray(state.position);
-    this.controls.target.fromArray(state.target);
-    const distance = Math.max(this.camera.position.distanceTo(this.controls.target), 1);
-    this.camera.near = Math.max(distance / 1000, 0.01);
-    this.camera.far = Math.max(distance * 50, 1000);
-    this.camera.updateProjectionMatrix();
-    this.controls.update();
-    this.requestRender();
+  setCamera(state: CameraState, animate = true): void {
+    this.moveCamera(
+      new THREE.Vector3().fromArray(state.position),
+      new THREE.Vector3().fromArray(state.target),
+      animate,
+    );
+  }
+
+  onCameraChange(listener: () => void): () => void {
+    this.cameraListeners.add(listener);
+    return () => this.cameraListeners.delete(listener);
+  }
+
+  setNavigationMode(mode: NavigationMode): void {
+    this.navMode = mode;
+    this.look = null;
+    this.keys.clear();
+    this.controls.enabled = mode !== 'walk';
+    this.controls.mouseButtons = {
+      LEFT: mode === 'pan' ? THREE.MOUSE.PAN : THREE.MOUSE.ROTATE,
+      MIDDLE: THREE.MOUSE.PAN,
+      RIGHT: mode === 'pan' ? THREE.MOUSE.ROTATE : THREE.MOUSE.PAN,
+    };
+    this.canvas.style.cursor =
+      mode === 'walk' ? 'move' : this.pickMode === 'point' ? 'crosshair' : '';
+  }
+
+  /**
+   * Puts the camera at `position` looking at `target`. Animated moves swing around the
+   * target rather than cutting straight through the model.
+   */
+  private moveCamera(position: THREE.Vector3, target: THREE.Vector3, animate = true): void {
+    cancelAnimationFrame(this.animation);
+    const apply = (p: THREE.Vector3, t: THREE.Vector3) => {
+      this.camera.position.copy(p);
+      this.controls.target.copy(t);
+      const distance = Math.max(p.distanceTo(t), 1);
+      this.camera.near = Math.max(distance / 1000, 0.01);
+      this.camera.far = Math.max(distance * 50, 1000);
+      this.camera.updateProjectionMatrix();
+      this.controls.update();
+      this.requestRender();
+    };
+    const reduced =
+      typeof window !== 'undefined' &&
+      window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
+    if (!animate || reduced) {
+      apply(position, target);
+      return;
+    }
+    const fromTarget = this.controls.target.clone();
+    const fromOffset = this.camera.position.clone().sub(fromTarget);
+    const toOffset = position.clone().sub(target);
+    const fromLength = fromOffset.length();
+    const toLength = toOffset.length();
+    const fromDir = fromOffset.normalize();
+    const toDir = toOffset.normalize();
+    // Opposite directions would pass through zero; nudge upwards so the swing goes over.
+    if (fromDir.dot(toDir) < -0.999) fromDir.add(new THREE.Vector3(0, 0.05, 0)).normalize();
+    const start = performance.now();
+    const duration = 380;
+    const step = (now: number) => {
+      const k = Math.min(1, (now - start) / duration);
+      const e = 1 - Math.pow(1 - k, 3);
+      const dir = fromDir.clone().lerp(toDir, e).normalize();
+      const t = fromTarget.clone().lerp(target, e);
+      apply(t.clone().addScaledVector(dir, fromLength + (toLength - fromLength) * e), t);
+      if (k < 1) this.animation = requestAnimationFrame(step);
+    };
+    this.animation = requestAnimationFrame(step);
   }
 
   snapshot(maxWidth = 320): string {
@@ -342,13 +422,7 @@ export class SceneController implements ViewportHandle {
       : this.camera.position.clone().sub(this.controls.target);
     if (towardCamera.lengthSq() < 1e-6) towardCamera.set(1, 0.8, 1.2);
     towardCamera.normalize();
-    this.camera.position.copy(center).addScaledVector(towardCamera, distance);
-    this.camera.near = Math.max(distance / 1000, 0.01);
-    this.camera.far = distance * 50;
-    this.camera.updateProjectionMatrix();
-    this.controls.target.copy(center);
-    this.controls.update();
-    this.requestRender();
+    this.moveCamera(center.clone().addScaledVector(towardCamera, distance), center);
   }
 
   select(mesh: THREE.Mesh | null): void {
@@ -374,6 +448,11 @@ export class SceneController implements ViewportHandle {
     this.canvas.removeEventListener('pointerdown', this.onPointerDown, { capture: true });
     this.canvas.removeEventListener('pointermove', this.onPointerMove);
     this.canvas.removeEventListener('pointerup', this.onPointerUp);
+    this.canvas.removeEventListener('wheel', this.onWheel);
+    window.removeEventListener('keydown', this.onKeyDown);
+    window.removeEventListener('keyup', this.onKeyUp);
+    cancelAnimationFrame(this.animation);
+    cancelAnimationFrame(this.walkFrame);
     this.gizmos.dispose();
     this.controls.removeEventListener('change', this.requestRender);
     this.controls.dispose();
@@ -396,6 +475,7 @@ export class SceneController implements ViewportHandle {
         this.renderer.autoClear = true;
         this.renderer.clippingPlanes = planes;
       }
+      for (const listener of this.cameraListeners) listener();
     });
   };
 
@@ -426,6 +506,8 @@ export class SceneController implements ViewportHandle {
   }
 
   private readonly onPointerDown = (event: PointerEvent): void => {
+    // Any press takes over from a camera move that is still animating.
+    cancelAnimationFrame(this.animation);
     if (event.button !== 0) return;
     this.pointerDown = { x: event.clientX, y: event.clientY };
 
@@ -461,10 +543,113 @@ export class SceneController implements ViewportHandle {
       this.drag = { kind: 'box', x: event.clientX, y: event.clientY, el };
       this.controls.enabled = false;
       this.canvas.setPointerCapture?.(event.pointerId);
+      return;
+    }
+
+    // Walk mode: dragging turns the head.
+    if (this.navMode === 'walk') {
+      this.look = { x: event.clientX, y: event.clientY };
+      this.canvas.setPointerCapture?.(event.pointerId);
     }
   };
 
+  /** Walking speed in metres per second, from the size of what is loaded. */
+  private walkSpeed(): number {
+    const size = this.contentBounds().getSize(new THREE.Vector3());
+    return Math.max(Math.max(size.x, size.y, size.z) / 12, 1.5);
+  }
+
+  /** Moves the eye and its target together, keeping the viewing direction. */
+  private walkBy(offset: THREE.Vector3): void {
+    this.camera.position.add(offset);
+    this.controls.target.add(offset);
+    this.camera.updateMatrixWorld();
+    this.requestRender();
+  }
+
+  private readonly onWheel = (event: WheelEvent): void => {
+    if (this.navMode !== 'walk') return;
+    event.preventDefault();
+    const forward = this.camera.getWorldDirection(new THREE.Vector3());
+    this.walkBy(forward.multiplyScalar((-Math.sign(event.deltaY) * this.walkSpeed()) / 4));
+  };
+
+  private static readonly WALK_KEYS = new Set([
+    'w',
+    'a',
+    's',
+    'd',
+    'q',
+    'e',
+    'arrowup',
+    'arrowdown',
+    'arrowleft',
+    'arrowright',
+    'shift',
+  ]);
+
+  private readonly onKeyDown = (event: KeyboardEvent): void => {
+    if (this.navMode !== 'walk') return;
+    const target = event.target as HTMLElement | null;
+    if (target && (target.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(target.tagName))) {
+      return;
+    }
+    const key = event.key.toLowerCase();
+    if (!SceneController.WALK_KEYS.has(key) || event.ctrlKey || event.metaKey) return;
+    event.preventDefault();
+    this.keys.add(key);
+    if (!this.walkFrame) {
+      this.walkLast = performance.now();
+      this.walkFrame = requestAnimationFrame(this.walkStep);
+    }
+  };
+
+  private readonly onKeyUp = (event: KeyboardEvent): void => {
+    this.keys.delete(event.key.toLowerCase());
+  };
+
+  private readonly walkStep = (now: number): void => {
+    const dt = Math.min((now - this.walkLast) / 1000, 0.1);
+    this.walkLast = now;
+    const k = this.keys;
+    const forward = this.camera.getWorldDirection(new THREE.Vector3());
+    forward.y = 0;
+    if (forward.lengthSq() < 1e-6) forward.set(0, 0, -1);
+    forward.normalize();
+    const right = new THREE.Vector3().crossVectors(forward, new THREE.Vector3(0, 1, 0));
+    const move = new THREE.Vector3();
+    if (k.has('w') || k.has('arrowup')) move.add(forward);
+    if (k.has('s') || k.has('arrowdown')) move.sub(forward);
+    if (k.has('d') || k.has('arrowright')) move.add(right);
+    if (k.has('a') || k.has('arrowleft')) move.sub(right);
+    if (k.has('e')) move.y += 1;
+    if (k.has('q')) move.y -= 1;
+    if (move.lengthSq() > 0) {
+      const speed = this.walkSpeed() * (k.has('shift') ? 3 : 1);
+      this.walkBy(move.normalize().multiplyScalar(speed * dt));
+    }
+    const moving = [...k].some((key) => key !== 'shift');
+    this.walkFrame = moving && this.navMode === 'walk' ? requestAnimationFrame(this.walkStep) : 0;
+  };
+
   private readonly onPointerMove = (event: PointerEvent): void => {
+    if (this.look && this.navMode === 'walk') {
+      const dx = event.clientX - this.look.x;
+      const dy = event.clientY - this.look.y;
+      this.look = { x: event.clientX, y: event.clientY };
+      const offset = this.controls.target.clone().sub(this.camera.position);
+      const distance = Math.max(offset.length(), 1);
+      const spherical = new THREE.Spherical().setFromVector3(offset);
+      spherical.theta -= dx * 0.004;
+      spherical.phi = THREE.MathUtils.clamp(spherical.phi + dy * 0.004, 0.05, Math.PI - 0.05);
+      spherical.radius = distance;
+      this.controls.target
+        .copy(this.camera.position)
+        .add(new THREE.Vector3().setFromSpherical(spherical));
+      this.camera.lookAt(this.controls.target);
+      this.requestRender();
+      return;
+    }
     const drag = this.drag;
     if (!drag) return;
     if (drag.kind === 'plane') {
@@ -528,6 +713,12 @@ export class SceneController implements ViewportHandle {
   }
 
   private readonly onPointerUp = (event: PointerEvent): void => {
+    if (this.look) {
+      this.look = null;
+      if (this.canvas.hasPointerCapture?.(event.pointerId)) {
+        this.canvas.releasePointerCapture(event.pointerId);
+      }
+    }
     if (this.finishDrag(event)) {
       this.pointerDown = null;
       return;

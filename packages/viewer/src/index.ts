@@ -4,6 +4,7 @@ export { Viewport, type ViewportProps } from './Viewport';
 export {
   SceneController,
   type CameraState,
+  type NavigationMode,
   type PickMode,
   type PickModifiers,
   type PickResult,
@@ -37,6 +38,7 @@ export {
   type ClashSource,
 } from './clash';
 export { IfcFrame, type Triple } from './ifc/coordinates';
+export { extractEdges, type EdgeSet } from './ifc/edges';
 export {
   AnalysisLayer,
   MEMBER_KIND_COLORS,
@@ -51,3 +53,5 @@ export {
   measure,
   type Measurement,
 } from './measure';
+export { ViewCube } from './ViewCube';
+export { cubeTransform } from './cube';
