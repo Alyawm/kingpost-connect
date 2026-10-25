@@ -44,6 +44,25 @@ takes elements entirely inside it, right to left also takes those it touches; ho
 as well to add to the selection. Colour the model by type, material, storey, design status,
 revision change or analysis link. Measure between two points; draw markup lines.
 
+**Several models at once.** With a model loaded, **+ Add** next to another revision in the
+Explorer shows it with the main model, lined up in IFC world coordinates (architecture,
+structure and services exported separately fall into place). The Models list in the Model
+panel shows the main model and the reference models: hide or show each, give it one colour
+or make it see-through, fit it, remove it, or make it the main model (the tree, properties,
+schedules and review work on the main model). Clicking an element of a reference model
+shows its properties. Saved views remember the reference models. In Coordination, "set B =
+all of …" runs a clash test between the main model's set A and a reference model.
+
+**Measuring.** The ruler opens the measure panel. Modes: **Distance** (two points, with the
+X/Y/Z components), **Angle** (point, corner, point), **Perpendicular** (a face, then a
+point: the distance square to that face), **Edge length** (one click on an edge) and
+**Point** (coordinates and elevation in the model's own coordinates). Points snap to
+corners (green), midpoints (cyan), edges (pink) and faces (orange); each snap can be
+switched off. A tip next to the cursor says what it will snap to and shows the value as
+you move. **Ortho** (or holding Shift) keeps distances along X, Y or Z. Every measurement
+is listed with its own delete button; **Clear all measurements** removes them all; Esc
+drops a measurement in progress and Backspace removes the last one.
+
 **Viewport controls.** Top right: **Orbit**, **Pan** and **Walk** decide what a left drag
 does. In Walk, drag to look around and move with `W A S D` or the arrow keys, `Q`/`E` for
 down and up, `Shift` to go faster, the wheel to step forward. **Undo** and **Redo**

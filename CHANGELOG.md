@@ -3,6 +3,21 @@
 All notable changes to KingPost Connect. The format follows Keep a Changelog; versions
 follow semantic versioning. Milestone tags match the headings below.
 
+## [1.5.0] — 2026-10-25 — Several models and measuring
+
+### Added
+- Reference models: add more revisions to the view, aligned in IFC world coordinates;
+  show, hide, colour, fade, fit, remove or make main; properties of picked reference
+  elements; reference models kept in saved views; clash tests between the main model and
+  a reference model.
+- Measuring: snapping to corners, midpoints, edges and faces with a marker and a cursor
+  tip; ortho (button or Shift); modes for distance, angle, perpendicular to a face, edge
+  length and point coordinates; live preview while measuring; a list with delete per
+  measurement and clear all; Esc and Backspace shortcuts.
+
+### Changed
+- Measurement labels keep the same size on screen at any zoom.
+
 ## [1.4.0] — 2026-10-25 — Viewer experience
 
 ### Added
