@@ -30,6 +30,7 @@ pub fn run() {
             model::search_elements,
             views::views_list,
             views::view_save,
+            views::view_update,
             views::view_rename,
             views::view_delete,
             review::issues_list,

@@ -203,6 +203,22 @@ export function viewSave(
   });
 }
 
+export function viewUpdate(
+  id: string,
+  cameraJson: string,
+  visibilityJson: string,
+  sectionPlanesJson: string,
+  thumbnail: string | null,
+): Promise<boolean> {
+  return invoke<boolean>('view_update', {
+    id,
+    cameraJson,
+    visibilityJson,
+    sectionPlanesJson,
+    thumbnail,
+  });
+}
+
 export function viewRename(id: string, name: string): Promise<boolean> {
   return invoke<boolean>('view_rename', { id, name });
 }

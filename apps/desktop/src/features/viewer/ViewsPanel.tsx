@@ -1,17 +1,18 @@
-import { useEffect, useState, type FormEvent } from 'react';
-import { Camera, Trash2 } from 'lucide-react';
+import { useEffect, useState, type FormEvent, type ReactNode } from 'react';
+import { Camera, EyeOff, Home, Palette, Pencil, RefreshCw, Scissors, Trash2 } from 'lucide-react';
 import { Button, cn } from '@kingpost/ui';
-import { useViews } from '../../state/views';
+import { useViews, type Visibility } from '../../state/views';
 import { useProject } from '../../state/project';
+import type { SavedView } from '../../lib/ipc';
 
-/** Saved views: name, thumbnail, apply on click, delete. */
+/** Saved views: name, thumbnail, apply on click, update, rename, delete. */
 export function ViewsPanel() {
   const views = useViews((s) => s.views);
   const busy = useViews((s) => s.busy);
+  const activeId = useViews((s) => s.activeId);
   const refresh = useViews((s) => s.refresh);
   const save = useViews((s) => s.save);
-  const apply = useViews((s) => s.apply);
-  const remove = useViews((s) => s.remove);
+  const home = useViews((s) => s.home);
   const project = useProject((s) => s.current);
   const [name, setName] = useState('');
 
@@ -27,7 +28,18 @@ export function ViewsPanel() {
 
   return (
     <div className="border-b border-edge px-3 py-2 text-xs">
-      <div className="mb-1 font-semibold text-fg-muted">Views</div>
+      <div className="mb-1 flex items-center justify-between">
+        <span className="font-semibold text-fg-muted">Views</span>
+        <button
+          type="button"
+          className="flex items-center gap-1 rounded px-1 py-0.5 text-[11px] text-fg-muted hover:bg-surface-2 hover:text-fg"
+          title="Show everything in its original colours, without a section"
+          onClick={home}
+        >
+          <Home size={11} />
+          Default view
+        </button>
+      </div>
       <form className="flex gap-1" onSubmit={onSubmit}>
         <input
           value={name}
@@ -40,7 +52,7 @@ export function ViewsPanel() {
           size="sm"
           type="submit"
           disabled={busy}
-          title="Save the current camera, section, colouring and hidden elements"
+          title="Save the camera, section, colouring, colours, transparency and hidden elements"
         >
           <Camera size={12} />
           Save
@@ -49,35 +61,135 @@ export function ViewsPanel() {
       {views.length > 0 && (
         <ul className="mt-2 grid grid-cols-2 gap-1.5">
           {views.map((view) => (
-            <li key={view.id} className="group relative">
-              <button
-                type="button"
-                className={cn(
-                  'w-full overflow-hidden rounded-md border border-edge bg-canvas text-left',
-                  'hover:border-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent',
-                )}
-                onClick={() => apply(view)}
-                title={`Apply "${view.name}"`}
-              >
-                {view.thumbnail ? (
-                  <img src={view.thumbnail} alt="" className="aspect-[16/10] w-full object-cover" />
-                ) : (
-                  <div className="aspect-[16/10] w-full bg-surface-2" />
-                )}
-                <div className="truncate px-1.5 py-1 text-[11px]">{view.name}</div>
-              </button>
-              <button
-                type="button"
-                aria-label={`Delete view ${view.name}`}
-                className="absolute right-1 top-1 hidden rounded bg-surface/90 p-0.5 text-fg-muted hover:text-danger group-hover:block"
-                onClick={() => void remove(view.id)}
-              >
-                <Trash2 size={12} />
-              </button>
-            </li>
+            <ViewCard key={view.id} view={view} active={view.id === activeId} busy={busy} />
           ))}
         </ul>
       )}
     </div>
   );
+}
+
+function ViewCard({ view, active, busy }: { view: SavedView; active: boolean; busy: boolean }) {
+  const apply = useViews((s) => s.apply);
+  const update = useViews((s) => s.update);
+  const rename = useViews((s) => s.rename);
+  const remove = useViews((s) => s.remove);
+  const [editing, setEditing] = useState(false);
+  const [draft, setDraft] = useState(view.name);
+  const contents = describe(view);
+
+  const commit = () => {
+    setEditing(false);
+    const trimmed = draft.trim();
+    if (trimmed && trimmed !== view.name) void rename(view.id, trimmed);
+    else setDraft(view.name);
+  };
+
+  return (
+    <li className="group relative">
+      <button
+        type="button"
+        className={cn(
+          'w-full overflow-hidden rounded-md border bg-canvas text-left',
+          active ? 'border-accent ring-1 ring-accent' : 'border-edge hover:border-accent',
+          'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent',
+        )}
+        onClick={() => apply(view)}
+        title={`Apply "${view.name}"`}
+      >
+        {view.thumbnail ? (
+          <img src={view.thumbnail} alt="" className="aspect-[16/10] w-full object-cover" />
+        ) : (
+          <div className="aspect-[16/10] w-full bg-surface-2" />
+        )}
+        {!editing && (
+          <div className="flex items-center gap-1 px-1.5 py-1 text-[11px]">
+            <span className="min-w-0 flex-1 truncate">{view.name}</span>
+            {contents.looks && <Palette size={10} className="shrink-0 text-fg-muted" />}
+            {contents.hidden && <EyeOff size={10} className="shrink-0 text-fg-muted" />}
+            {contents.section && <Scissors size={10} className="shrink-0 text-fg-muted" />}
+          </div>
+        )}
+      </button>
+      {editing && (
+        <input
+          autoFocus
+          value={draft}
+          aria-label="New view name"
+          onChange={(e) => setDraft(e.target.value)}
+          onBlur={commit}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter') commit();
+            if (e.key === 'Escape') {
+              setDraft(view.name);
+              setEditing(false);
+            }
+          }}
+          className="absolute inset-x-0 bottom-0 h-6 rounded-b-md border border-accent bg-canvas px-1.5 text-[11px] outline-none"
+        />
+      )}
+      <div className="absolute right-1 top-1 hidden gap-0.5 group-hover:flex">
+        <CardAction
+          label={`Update "${view.name}" with the current view`}
+          disabled={busy}
+          onClick={() => void update(view.id)}
+        >
+          <RefreshCw size={12} />
+        </CardAction>
+        <CardAction label={`Rename "${view.name}"`} onClick={() => setEditing(true)}>
+          <Pencil size={12} />
+        </CardAction>
+        <CardAction label={`Delete view ${view.name}`} danger onClick={() => void remove(view.id)}>
+          <Trash2 size={12} />
+        </CardAction>
+      </div>
+    </li>
+  );
+}
+
+function CardAction({
+  label,
+  onClick,
+  disabled,
+  danger,
+  children,
+}: {
+  label: string;
+  onClick(): void;
+  disabled?: boolean;
+  danger?: boolean;
+  children: ReactNode;
+}) {
+  return (
+    <button
+      type="button"
+      aria-label={label}
+      title={label}
+      disabled={disabled}
+      className={cn(
+        'rounded bg-surface/90 p-0.5 text-fg-muted disabled:opacity-50',
+        danger ? 'hover:text-danger' : 'hover:text-fg',
+      )}
+      onClick={onClick}
+    >
+      {children}
+    </button>
+  );
+}
+
+/** What a view changes, for the small icons on its card. */
+function describe(view: SavedView): { looks: boolean; hidden: boolean; section: boolean } {
+  let visibility: Partial<Visibility> = {};
+  let section: { enabled?: boolean } = {};
+  try {
+    visibility = JSON.parse(view.visibility_json) as Partial<Visibility>;
+    section = JSON.parse(view.section_planes_json) as { enabled?: boolean };
+  } catch {
+    // An unreadable payload shows no icons.
+  }
+  return {
+    looks: (visibility.looks?.length ?? 0) > 0,
+    hidden: (visibility.hidden?.length ?? 0) > 0,
+    section: section.enabled === true,
+  };
 }

@@ -1,33 +1,206 @@
 import { create } from 'zustand';
 import type { CameraState } from '@kingpost/viewer';
-import { viewDelete, viewRename, viewSave, viewsList, type SavedView } from '../lib/ipc';
+import {
+  viewDelete,
+  viewRename,
+  viewSave,
+  viewUpdate,
+  viewsList,
+  type ElementSummary,
+  type SavedView,
+} from '../lib/ipc';
+import { useAppearance, type Look } from './appearance';
 import { log } from './log';
 import { useModel } from './model';
 import { useProject } from './project';
 import { useView, type ColorBy, type Section } from './view';
 import { useViewer } from './viewer';
 
-/** What a saved view restores besides the camera. Stored as JSON, owned by this file. */
-interface Visibility {
+/** Elements sharing one colour/opacity override, by GlobalId. */
+export interface LookGroup {
+  color?: string;
+  opacity?: number;
+  ids: string[];
+}
+
+/**
+ * What a saved view restores besides the camera. Stored as JSON, owned by this file.
+ *
+ * Version 2 records hidden elements and overrides by GlobalId, so a view also applies to
+ * a later revision of the same model. `hidden` (express ids) is still written so builds
+ * that only know version 1 keep working.
+ */
+export interface Visibility {
   revisionId: number | null;
   relPath: string | null;
   hidden: number[];
   colorBy: ColorBy;
+  version?: 2;
+  /** Hidden elements; or, when most of the model is hidden, `shownGlobalIds` instead. */
+  hiddenGlobalIds?: string[];
+  shownGlobalIds?: string[];
+  looks?: LookGroup[];
 }
 
 interface ViewsState {
   views: SavedView[];
   busy: boolean;
+  /** The view last saved or applied, highlighted in the list. */
+  activeId: string | null;
   refresh(): Promise<void>;
   save(name: string): Promise<void>;
+  /** Overwrites a view with what is on screen now. */
+  update(id: string): Promise<void>;
   apply(view: SavedView): void;
+  /** Everything visible, original colours, no section, whole model in view. */
+  home(): void;
   rename(id: string, name: string): Promise<void>;
   remove(id: string): Promise<void>;
+}
+
+/** Captures the current visibility, colouring and overrides. */
+export function encodeVisibility(input: {
+  revisionId: number | null;
+  relPath: string | null;
+  elements: ElementSummary[];
+  byId: ReadonlyMap<number, ElementSummary>;
+  hidden: ReadonlySet<number>;
+  looks: ReadonlyMap<number, Look>;
+  colorBy: ColorBy;
+}): Visibility {
+  const visibility: Visibility = {
+    version: 2,
+    revisionId: input.revisionId,
+    relPath: input.relPath,
+    hidden: [...input.hidden],
+    colorBy: input.colorBy,
+  };
+  if (input.hidden.size > 0) {
+    const drawable = input.elements.filter((e) => e.has_geometry && !e.is_spatial);
+    if (input.hidden.size > drawable.length / 2) {
+      visibility.shownGlobalIds = drawable
+        .filter((e) => !input.hidden.has(e.express_id))
+        .map((e) => e.global_id);
+    } else {
+      visibility.hiddenGlobalIds = globalIds(input.hidden, input.byId);
+    }
+  }
+  if (input.looks.size > 0) {
+    const groups = new Map<string, LookGroup>();
+    for (const [id, look] of input.looks) {
+      const globalId = input.byId.get(id)?.global_id;
+      if (!globalId) continue;
+      const key = `${look.color ?? ''}|${look.opacity ?? ''}`;
+      let group = groups.get(key);
+      if (!group) {
+        group = { ids: [] };
+        if (look.color) group.color = look.color;
+        if (look.opacity !== undefined) group.opacity = look.opacity;
+        groups.set(key, group);
+      }
+      group.ids.push(globalId);
+    }
+    visibility.looks = [...groups.values()];
+  }
+  return visibility;
+}
+
+/**
+ * Resolves a stored visibility against the loaded revision. Version 2 matches by GlobalId
+ * on any revision; version 1 applies only to the revision it was saved on.
+ */
+export function decodeVisibility(
+  visibility: Visibility,
+  model: {
+    revisionId: number | null;
+    elements: ElementSummary[];
+    byGlobalId: ReadonlyMap<string, number>;
+  },
+): { hidden: number[]; looks: Map<number, Look>; matched: number; missing: number } | null {
+  const sameRevision = visibility.revisionId === null || visibility.revisionId === model.revisionId;
+  if (visibility.version !== 2) {
+    return sameRevision
+      ? { hidden: visibility.hidden, looks: new Map(), matched: 0, missing: 0 }
+      : null;
+  }
+  let matched = 0;
+  let missing = 0;
+  const resolve = (globalId: string): number | undefined => {
+    const id = model.byGlobalId.get(globalId);
+    if (id === undefined) missing++;
+    else matched++;
+    return id;
+  };
+  let hidden: number[] = [];
+  if (visibility.shownGlobalIds) {
+    const shown = new Set<number>();
+    for (const g of visibility.shownGlobalIds) {
+      const id = resolve(g);
+      if (id !== undefined) shown.add(id);
+    }
+    hidden = model.elements
+      .filter((e) => e.has_geometry && !e.is_spatial && !shown.has(e.express_id))
+      .map((e) => e.express_id);
+  } else if (visibility.hiddenGlobalIds) {
+    for (const g of visibility.hiddenGlobalIds) {
+      const id = resolve(g);
+      if (id !== undefined) hidden.push(id);
+    }
+  }
+  const looks = new Map<number, Look>();
+  for (const group of visibility.looks ?? []) {
+    const look: Look = {};
+    if (group.color) look.color = group.color;
+    if (group.opacity !== undefined) look.opacity = group.opacity;
+    for (const g of group.ids) {
+      const id = resolve(g);
+      if (id !== undefined) looks.set(id, look);
+    }
+  }
+  return { hidden, looks, matched, missing };
+}
+
+function globalIds(ids: Iterable<number>, byId: ReadonlyMap<number, ElementSummary>): string[] {
+  const out: string[] = [];
+  for (const id of ids) {
+    const globalId = byId.get(id)?.global_id;
+    if (globalId) out.push(globalId);
+  }
+  return out;
+}
+
+/** The current camera, visibility, section and a thumbnail, ready to store. */
+function capture(): {
+  camera: string;
+  visibility: string;
+  section: string;
+  thumbnail: string;
+} | null {
+  const handle = useViewer.getState().handle;
+  if (!handle) return null;
+  const model = useModel.getState();
+  const view = useView.getState();
+  const visibility = encodeVisibility({
+    revisionId: model.revision?.id ?? null,
+    relPath: model.relPath,
+    elements: model.elements,
+    byId: model.byId,
+    hidden: model.hidden,
+    looks: useAppearance.getState().looks,
+    colorBy: view.colorBy,
+  });
+  return {
+    camera: JSON.stringify(handle.getCamera()),
+    visibility: JSON.stringify(visibility),
+    section: JSON.stringify(view.section),
+    thumbnail: handle.snapshot(320),
+  };
 }
 
 export const useViews = create<ViewsState>((set, get) => ({
   views: [],
   busy: false,
+  activeId: null,
 
   refresh: async () => {
     if (!useProject.getState().current) {
@@ -42,29 +215,39 @@ export const useViews = create<ViewsState>((set, get) => ({
   },
 
   save: async (name) => {
-    const handle = useViewer.getState().handle;
-    if (!handle) return;
-    const model = useModel.getState();
-    const view = useView.getState();
-    const visibility: Visibility = {
-      revisionId: model.revision?.id ?? null,
-      relPath: model.relPath,
-      hidden: [...model.hidden],
-      colorBy: view.colorBy,
-    };
+    const state = capture();
+    if (!state) return;
     set({ busy: true });
     try {
-      await viewSave(
+      const saved = await viewSave(
         name,
-        JSON.stringify(handle.getCamera()),
-        JSON.stringify(visibility),
-        JSON.stringify(view.section),
-        handle.snapshot(320),
+        state.camera,
+        state.visibility,
+        state.section,
+        state.thumbnail,
       );
       log.info(`Saved view "${name.trim()}"`);
+      set({ activeId: saved.id });
       await get().refresh();
     } catch (error) {
       log.error(`Could not save view: ${String(error)}`);
+    } finally {
+      set({ busy: false });
+    }
+  },
+
+  update: async (id) => {
+    const state = capture();
+    if (!state) return;
+    set({ busy: true });
+    try {
+      await viewUpdate(id, state.camera, state.visibility, state.section, state.thumbnail);
+      const name = get().views.find((v) => v.id === id)?.name ?? 'view';
+      log.info(`Updated view "${name}" with the current view`);
+      set({ activeId: id });
+      await get().refresh();
+    } catch (error) {
+      log.error(`Could not update view: ${String(error)}`);
     } finally {
       set({ busy: false });
     }
@@ -80,18 +263,40 @@ export const useViews = create<ViewsState>((set, get) => ({
 
     if (camera) handle.setCamera(camera);
     if (section) useView.getState().setSection(section);
+    set({ activeId: view.id });
 
-    if (visibility && model.model) {
-      if (visibility.revisionId !== null && visibility.revisionId !== model.revision?.id) {
-        log.warn(
-          `View "${view.name}" was saved on another revision (${visibility.relPath ?? '?'}); applying camera and section only.`,
-        );
-      } else {
-        model.showAll();
-        if (visibility.hidden.length) model.hide(visibility.hidden);
-        useView.getState().setColorBy(visibility.colorBy);
-      }
+    if (!visibility || !model.model) return;
+    const resolved = decodeVisibility(visibility, {
+      revisionId: model.revision?.id ?? null,
+      elements: model.elements,
+      byGlobalId: model.byGlobalId,
+    });
+    if (!resolved) {
+      log.warn(
+        `View "${view.name}" was saved on another revision (${visibility.relPath ?? '?'}); applying camera and section only.`,
+      );
+      return;
     }
+    model.showAll();
+    if (resolved.hidden.length) model.hide(resolved.hidden);
+    useAppearance.getState().replace(resolved.looks);
+    useView.getState().setColorBy(visibility.colorBy);
+    if (resolved.missing > 0) {
+      log.warn(
+        `View "${view.name}": ${resolved.missing.toLocaleString()} element(s) it refers to are not in this revision.`,
+      );
+    }
+  },
+
+  home: () => {
+    const handle = useViewer.getState().handle;
+    const model = useModel.getState();
+    model.showAll();
+    useAppearance.getState().reset();
+    useView.getState().setColorBy('none');
+    useView.getState().setSection({ enabled: false });
+    handle?.viewFrom('iso');
+    set({ activeId: null });
   },
 
   rename: async (id, name) => {
@@ -106,6 +311,7 @@ export const useViews = create<ViewsState>((set, get) => ({
   remove: async (id) => {
     try {
       await viewDelete(id);
+      if (get().activeId === id) set({ activeId: null });
       await get().refresh();
     } catch (error) {
       log.error(`Could not delete view: ${String(error)}`);
@@ -123,5 +329,8 @@ function parse<T>(json: string): T | null {
 
 // Views belong to the project: reload the list whenever the open project changes.
 useProject.subscribe((state, previous) => {
-  if (state.current?.id !== previous.current?.id) void useViews.getState().refresh();
+  if (state.current?.id !== previous.current?.id) {
+    useViews.setState({ activeId: null });
+    void useViews.getState().refresh();
+  }
 });

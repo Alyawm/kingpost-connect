@@ -107,6 +107,31 @@ pub fn view_save(
     })
 }
 
+/// Overwrites a view with the current camera, visibility, section and thumbnail.
+#[tauri::command]
+pub fn view_update(
+    state: State<'_, AppState>,
+    id: String,
+    camera_json: String,
+    visibility_json: String,
+    section_planes_json: String,
+    thumbnail: Option<String>,
+) -> Result<bool, String> {
+    let bytes = thumbnail.as_deref().map(decode_thumbnail).transpose()?;
+    state.with_project(|project| {
+        project
+            .store()
+            .update_saved_view(
+                &id,
+                &camera_json,
+                &visibility_json,
+                &section_planes_json,
+                bytes.as_deref(),
+            )
+            .map_err(describe)
+    })
+}
+
 #[tauri::command]
 pub fn view_rename(state: State<'_, AppState>, id: String, name: String) -> Result<bool, String> {
     let name = name.trim();

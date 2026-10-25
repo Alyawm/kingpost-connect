@@ -68,6 +68,31 @@ impl Store {
         Ok(())
     }
 
+    /// Replaces what a view shows (camera, visibility, section, thumbnail), keeping its
+    /// name, id and creation time. A `None` thumbnail keeps the stored one.
+    pub fn update_saved_view(
+        &self,
+        id: &str,
+        camera_json: &str,
+        visibility_json: &str,
+        section_planes_json: &str,
+        thumbnail: Option<&[u8]>,
+    ) -> Result<bool> {
+        Ok(self.conn.execute(
+            "UPDATE saved_view
+             SET camera_json = ?2, visibility_json = ?3, section_planes_json = ?4,
+                 thumbnail = COALESCE(?5, thumbnail)
+             WHERE id = ?1",
+            params![
+                id,
+                camera_json,
+                visibility_json,
+                section_planes_json,
+                thumbnail
+            ],
+        )? > 0)
+    }
+
     pub fn rename_saved_view(&self, id: &str, name: &str) -> Result<bool> {
         Ok(self.conn.execute(
             "UPDATE saved_view SET name = ?2 WHERE id = ?1",
@@ -115,6 +140,30 @@ mod tests {
         );
         assert_eq!(store.saved_view_thumbnail("v2").unwrap(), None);
         assert_eq!(store.saved_view_thumbnail("missing").unwrap(), None);
+
+        assert!(
+            store
+                .update_saved_view("v1", "{\"p\":2}", "{\"h\":1}", "[1]", None)
+                .unwrap()
+        );
+        let updated = &store.saved_views().unwrap()[0];
+        assert_eq!(updated.camera_json, "{\"p\":2}");
+        assert_eq!(updated.visibility_json, "{\"h\":1}");
+        assert_eq!(
+            store.saved_view_thumbnail("v1").unwrap(),
+            Some(vec![1, 2, 3])
+        );
+        assert!(
+            store
+                .update_saved_view("v1", "{}", "{}", "[]", Some(&[9]))
+                .unwrap()
+        );
+        assert_eq!(store.saved_view_thumbnail("v1").unwrap(), Some(vec![9]));
+        assert!(
+            !store
+                .update_saved_view("missing", "{}", "{}", "[]", None)
+                .unwrap()
+        );
 
         assert!(store.rename_saved_view("v2", "Plan level 2").unwrap());
         assert!(store.delete_saved_view("v1").unwrap());
