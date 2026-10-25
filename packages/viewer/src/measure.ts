@@ -17,7 +17,7 @@ export function measure(a: THREE.Vector3, b: THREE.Vector3): Measurement {
 }
 
 /** Line, end markers and a distance label, drawn on top of the model. */
-export function createMeasurementObject(m: Measurement): THREE.Group {
+export function createMeasurementObject(m: Measurement, text?: string): THREE.Group {
   const group = new THREE.Group();
   group.name = 'measurement';
 
@@ -39,9 +39,9 @@ export function createMeasurementObject(m: Measurement): THREE.Group {
     group.add(marker);
   }
 
-  const label = textSprite(formatDistance(m.distance));
+  const label = textSprite(text ?? formatDistance(m.distance));
   label.position.copy(m.a).lerp(m.b, 0.5);
-  label.scale.set(LABEL_SIZE * 3.2, LABEL_SIZE, 1);
+  sizeLabel(label);
   label.renderOrder = 12;
   group.add(label);
 
@@ -83,16 +83,24 @@ export function formatDistance(metres: number): string {
   return `${metres.toFixed(metres < 10 ? 3 : 2)} m`;
 }
 
-function textSprite(text: string, width = 256): THREE.Sprite {
+/** Font of all labels; the canvas is sized to the text it carries. */
+const LABEL_FONT = '600 40px "Segoe UI", system-ui, sans-serif';
+
+function textSprite(text: string, minWidth = 160): THREE.Sprite {
   const canvas = document.createElement('canvas');
-  canvas.width = width;
   canvas.height = 80;
   const context = canvas.getContext('2d');
+  let width = minWidth;
+  if (context) {
+    context.font = LABEL_FONT;
+    width = Math.max(minWidth, Math.ceil(context.measureText(text).width) + 48);
+  }
+  canvas.width = width;
   if (context) {
     context.fillStyle = 'rgba(14, 17, 22, 0.85)';
     roundRect(context, 4, 4, canvas.width - 8, canvas.height - 8, 14);
     context.fill();
-    context.font = '600 40px "Segoe UI", system-ui, sans-serif';
+    context.font = LABEL_FONT;
     context.fillStyle = '#ffb020';
     context.textAlign = 'center';
     context.textBaseline = 'middle';
@@ -107,7 +115,16 @@ function textSprite(text: string, width = 256): THREE.Sprite {
     transparent: true,
     sizeAttenuation: false,
   });
-  return new THREE.Sprite(material);
+  const sprite = new THREE.Sprite(material);
+  // Width over height, so callers keep the box in proportion to its text.
+  sprite.userData.aspect = width / canvas.height;
+  return sprite;
+}
+
+/** Scales a label to the constant on-screen height, keeping its proportions. */
+function sizeLabel(sprite: THREE.Sprite): void {
+  const aspect = (sprite.userData.aspect as number | undefined) ?? 3.2;
+  sprite.scale.set(LABEL_SIZE * aspect, LABEL_SIZE, 1);
 }
 
 function roundRect(
@@ -159,7 +176,7 @@ function label(text: string, at: THREE.Vector3, height: number): THREE.Sprite {
   sprite.position.copy(at);
   // Constant size on screen, whatever the distance (height is kept for older callers).
   void height;
-  sprite.scale.set(LABEL_SIZE * 3.2, LABEL_SIZE, 1);
+  sizeLabel(sprite);
   sprite.renderOrder = 12;
   return sprite;
 }
@@ -172,6 +189,7 @@ export function createAngleObject(
   vertex: THREE.Vector3,
   b: THREE.Vector3,
   degrees: number,
+  text?: string,
 ): THREE.Group {
   const group = new THREE.Group();
   group.name = 'measurement';
@@ -195,7 +213,7 @@ export function createAngleObject(
     const mid = un.clone().add(vn).normalize();
     group.add(
       label(
-        `${degrees.toFixed(1)}°`,
+        text ?? `${degrees.toFixed(1)}°`,
         vertex.clone().addScaledVector(mid.lengthSq() > 0 ? mid : un, radius * 1.6),
         labelHeight(radius * 3),
       ),
@@ -209,6 +227,7 @@ export function createPerpendicularObject(
   point: THREE.Vector3,
   foot: THREE.Vector3,
   distance: number,
+  text?: string,
 ): THREE.Group {
   const group = new THREE.Group();
   group.name = 'measurement';
@@ -217,7 +236,11 @@ export function createPerpendicularObject(
   group.add(marker(point, size));
   group.add(marker(foot, size, 0x4dd4e0));
   group.add(
-    label(`⊥ ${formatDistance(distance)}`, point.clone().lerp(foot, 0.5), labelHeight(distance)),
+    label(
+      `⊥ ${text ?? formatDistance(distance)}`,
+      point.clone().lerp(foot, 0.5),
+      labelHeight(distance),
+    ),
   );
   return group;
 }
@@ -228,9 +251,9 @@ export function createPointObject(point: THREE.Vector3, text: string, span: numb
   group.name = 'measurement';
   group.add(marker(point, Math.max(0.05, span * 0.004)));
   const lift = new THREE.Vector3(0, labelHeight(span * 0.1) * 0.9, 0);
-  const sprite = textSprite(text, 640);
+  const sprite = textSprite(text);
   sprite.position.copy(point).add(lift);
-  sprite.scale.set(LABEL_SIZE * 8, LABEL_SIZE, 1);
+  sizeLabel(sprite);
   sprite.renderOrder = 12;
   group.add(sprite);
   return group;
@@ -241,4 +264,23 @@ export function createPreviewObject(points: THREE.Vector3[]): THREE.Line {
   const line = overlayLine(points, 0x5b9dff, true);
   line.name = 'preview';
   return line;
+}
+
+const NOTE_COLOR = 0xf5b941;
+
+/** A note pin: a stem from the point and a label with its number and text. */
+export function createNoteObject(point: THREE.Vector3, text: string, span: number): THREE.Group {
+  const group = new THREE.Group();
+  group.name = 'note';
+  const lift = Math.max(span * 0.02, 0.4);
+  const top = point.clone().add(new THREE.Vector3(0, lift, 0));
+  group.add(overlayLine([point, top], NOTE_COLOR));
+  group.add(marker(point, Math.max(0.04, span * 0.003), NOTE_COLOR));
+  const sprite = textSprite(text.length > 48 ? `${text.slice(0, 47)}…` : text);
+  sprite.position.copy(top);
+  sprite.center.set(0.5, 0);
+  sizeLabel(sprite);
+  sprite.renderOrder = 12;
+  group.add(sprite);
+  return group;
 }

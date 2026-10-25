@@ -1,5 +1,5 @@
 // The viewer owns the three.js dependency; the application gets the vector type from here.
-export { Vector3 } from 'three';
+export { Box3, Matrix4, Vector3 } from 'three';
 export { Viewport, type ViewportProps } from './Viewport';
 export {
   SceneController,
@@ -52,6 +52,7 @@ export {
   createAngleObject,
   createPerpendicularObject,
   createPointObject,
+  createNoteObject,
   formatDistance,
   measure,
   type Measurement,

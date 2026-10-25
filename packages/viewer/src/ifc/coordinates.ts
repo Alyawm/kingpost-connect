@@ -31,6 +31,16 @@ export class IfcFrame {
     return to.toViewer.clone().multiply(from.toIfc);
   }
 
+  /** Viewer → IFC world transform (a copy). */
+  matrixToIfc(): THREE.Matrix4 {
+    return this.toIfc.clone();
+  }
+
+  /** IFC world → viewer transform (a copy). */
+  matrixToViewer(): THREE.Matrix4 {
+    return this.toViewer.clone();
+  }
+
   static identity(): IfcFrame {
     return new IfcFrame(null);
   }

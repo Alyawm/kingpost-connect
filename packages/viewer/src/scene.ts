@@ -83,7 +83,7 @@ export interface ViewportHandle {
   /** Called after every frame in which the camera may have moved; returns an unsubscribe. */
   onCameraChange(listener: () => void): () => void;
   /** Renders a frame and returns it as a JPEG data URL no wider than `maxWidth`. */
-  snapshot(maxWidth?: number): string;
+  snapshot(maxWidth?: number, format?: 'jpeg' | 'png'): string;
   fit(): void;
   fitTo(box: THREE.Box3, direction?: ViewDirection): void;
   viewFrom(direction: ViewDirection): void;
@@ -523,7 +523,7 @@ export class SceneController implements ViewportHandle {
     this.animation = requestAnimationFrame(step);
   }
 
-  snapshot(maxWidth = 320): string {
+  snapshot(maxWidth = 320, format: 'jpeg' | 'png' = 'jpeg'): string {
     // Draw straight after rendering: the WebGL buffer stays readable until this task ends.
     this.renderer.render(this.scene, this.camera);
     const scale = Math.min(1, maxWidth / Math.max(this.canvas.width, 1));
@@ -531,7 +531,7 @@ export class SceneController implements ViewportHandle {
     target.width = Math.max(1, Math.round(this.canvas.width * scale));
     target.height = Math.max(1, Math.round(this.canvas.height * scale));
     target.getContext('2d')?.drawImage(this.canvas, 0, 0, target.width, target.height);
-    return target.toDataURL('image/jpeg', 0.75);
+    return format === 'png' ? target.toDataURL('image/png') : target.toDataURL('image/jpeg', 0.75);
   }
 
   clear(keep: THREE.Object3D[] = []): void {
