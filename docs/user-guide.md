@@ -78,6 +78,27 @@ you move. **Ortho** (or holding Shift) keeps distances along X, Y or Z. Every me
 is listed with its own delete button; **Clear all measurements** removes them all; Esc
 drops a measurement in progress and Backspace removes the last one.
 
+**Notes.** The note tool pins a note to the model: click where it goes, type, Enter saves.
+Notes show in the view with their number and text, are listed in the Model panel (click to
+look at one, edit, delete, hide all), and are kept with the project in IFC coordinates, so
+they stay put on later revisions.
+
+**Links.** The Properties panel of a selected element can hold links to web pages
+(specifications, product sheets) or files (drawings, calculations); click a link to open
+it with the system. Files inside the project folder are stored by their relative path.
+
+**Section box and image export.** The box button puts six section planes around the
+selection (or the whole model); drag any face's arrow to resize it. The image button saves
+the current view as a full-resolution PNG.
+
+**Placement of reference models.** For a reference model exported in other coordinates,
+its colour popover in the Models list has placement fields: move along IFC X, Y, Z and turn
+about the vertical through the model's centre. Saved views keep the placement.
+
+**Units.** Settings → Units chooses how lengths (automatic, mm, cm, m, inches, feet,
+feet-and-inches), decimals, areas, volumes and angles are shown in measurements, selection
+sizes and section positions. Existing measurements relabel when the units change.
+
 **Viewport controls.** Top right: **Orbit**, **Pan** and **Walk** decide what a left drag
 does. In Walk, drag to look around and move with `W A S D` or the arrow keys, `Q`/`E` for
 down and up, `Shift` to go faster, the wheel to step forward. **Undo** and **Redo**

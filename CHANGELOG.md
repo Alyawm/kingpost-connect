@@ -3,6 +3,22 @@
 All notable changes to KingPost Connect. The format follows Keep a Changelog; versions
 follow semantic versioning. Milestone tags match the headings below.
 
+## [1.7.0] — 2026-10-25 — Notes, links, units and section box
+
+### Added
+- Notes pinned in the model (note tool, list in the Model panel, edit, delete, hide), kept
+  in the project in IFC coordinates (migration 009).
+- Links from elements to web pages or files, shown in the Properties panel and opened with
+  the system; web links must be http(s), files inside the project are kept relative.
+- Section box around the selection or the model (six draggable planes).
+- Export of the current view as a full-resolution PNG.
+- Placement offsets (move X/Y/Z, turn about vertical) for reference models, kept in views.
+- Units and precision for lengths (metric and imperial, feet-and-inches), areas, volumes
+  and angles, used by measurements, selection sizes and section positions.
+
+### Changed
+- Labels size their box to their text.
+
 ## [1.6.0] — 2026-10-25 — Title bar, toolbar and Projects page
 
 ### Added
