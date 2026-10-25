@@ -1,7 +1,7 @@
 {
   "name": "kingpost-connect",
   "private": true,
-  "version": "1.3.0",
+  "version": "1.4.0",
   "description": "Structural collaboration desktop: IFC review, revision comparison, analysis overlay, drawing linking.",
   "license": "SEE LICENSE IN LICENSE",
   "packageManager": "pnpm@12.10.1",

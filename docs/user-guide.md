@@ -44,6 +44,16 @@ takes elements entirely inside it, right to left also takes those it touches; ho
 as well to add to the selection. Colour the model by type, material, storey, design status,
 revision change or analysis link. Measure between two points; draw markup lines.
 
+**Viewport controls.** Top right: **Orbit**, **Pan** and **Walk** decide what a left drag
+does. In Walk, drag to look around and move with `W A S D` or the arrow keys, `Q`/`E` for
+down and up, `Shift` to go faster, the wheel to step forward. **Undo** and **Redo**
+(`Ctrl+Z`, `Ctrl+Y`) step back through hiding, colours, transparency and section planes;
+changes made in one go (a slider drag) are one step. The edge button draws element outlines
+(on by default; drawn in the background after a model opens). The last button hides the
+panels to focus on the model. The cube in the bottom corner turns with the view: click a
+face to look from that side, or **Iso** for the standard view. Camera moves are animated
+unless Windows is set to reduce motion.
+
 **Section planes.** Use **Place on face** (or the scissors in the viewport toolbar) and
 click any face: a plane is placed on it, facing out of the face, and nothing is cut yet.
 Drag the plane's arrow into the model to cut. Add as many planes as needed; every enabled
@@ -54,8 +64,9 @@ centre, and "Plan view of storey" places a cut just below a storey's top and loo
 Section planes are saved in views and in issue viewpoints (BCF).
 
 **Colours and transparency.** With elements selected, a bar at the bottom of the viewport
-offers Appearance (colour swatches, a custom colour, a transparency slider), Hide (`H`),
-Isolate (`I`), Ghost everything else (`G`), fit and reset. `Shift+H` shows everything again
+shows how many are selected and their overall size (width × depth × height), and offers
+Appearance (colour swatches, a custom colour, a transparency slider), Hide (`H`), Show
+only (`I`), Ghost everything else (`G`), fit and reset. `Shift+H` shows everything again
 and `Esc` clears the selection. A colour set here wins over "colour by"; the reset button
 in the Model panel header returns every element to its original look.
 
@@ -70,7 +81,8 @@ view to update it with what is on screen now, rename or delete it. Views remembe
 by their IFC GlobalId, so a view saved on one revision also applies to the next; elements
 that no longer exist are reported in the output panel. "Default view" shows everything in
 its original colours without a section. The star on a view makes it the project's default
-look: it is applied whenever a model of the project is opened.
+look: it is applied whenever a model of the project is opened. **Play** shows the saved
+views one after another, a few seconds each, like a presentation; **Stop** ends it.
 
 ## Review
 

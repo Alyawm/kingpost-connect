@@ -3,6 +3,23 @@
 All notable changes to KingPost Connect. The format follows Keep a Changelog; versions
 follow semantic versioning. Milestone tags match the headings below.
 
+## [1.4.0] — 2026-10-25 — Viewer experience
+
+### Added
+- Element edge lines (outlines and creases), built in the background after a model opens;
+  they hide and fade with their elements. Toggle in the viewport toolbar, remembered.
+- Undo and redo for hiding, colours, transparency and section planes (Ctrl+Z, Ctrl+Y).
+- Navigation modes: orbit, pan, and walk (mouse look, W A S D, Q/E, Shift).
+- Orientation cube in the viewport corner; click a face for that view.
+- Focus mode that hides the panels.
+- Size of the selection (width × depth × height) in the selection bar.
+- Views presentation: play the saved views one after another.
+
+### Changed
+- Camera moves animate (respecting the system's reduced-motion setting).
+- "Isolate" is called "Show only" in the selection bar and commands.
+- The orientation cube replaces the Iso/Top/Front/Side buttons.
+
 ## [1.3.0] — 2026-10-25 — Sections, selection and schedule formulas
 
 ### Added
