@@ -8,6 +8,7 @@ import { useUi } from './state/ui';
 vi.mock('@kingpost/viewer', () => ({
   Viewport: () => <canvas data-testid="viewport" />,
   createSampleFrame: () => ({}),
+  ViewCube: () => null,
   loadIfcToGroup: vi.fn(),
 }));
 

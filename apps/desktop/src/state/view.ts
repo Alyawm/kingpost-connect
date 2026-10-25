@@ -9,6 +9,7 @@ import {
   withOffset,
   type ClipPlaneSpec,
   type Measurement,
+  type NavigationMode,
   type PointPick,
 } from '@kingpost/viewer';
 import type { ElementSummary, Triple } from '../lib/ipc';
@@ -53,6 +54,12 @@ interface ViewState {
   activePlaneId: string | null;
   /** Whether plane handles are drawn in the viewport. */
   showPlaneHandles: boolean;
+  /** What a left drag does in the viewport. */
+  navMode: NavigationMode;
+  /** Element edge lines on the model (remembered between sessions). */
+  edges: boolean;
+  setNavMode(mode: NavigationMode): void;
+  setEdges(on: boolean): void;
   colorBy: ColorBy;
   legend: LegendEntry[];
   /** First point of a measurement or markup in progress, if any. */
@@ -197,6 +204,8 @@ export const useView = create<ViewState>((set, get) => ({
   planes: [],
   activePlaneId: null,
   showPlaneHandles: true,
+  navMode: 'orbit',
+  edges: loadEdges(),
   colorBy: 'none',
   legend: [],
   pendingPoint: null,
@@ -263,6 +272,24 @@ export const useView = create<ViewState>((set, get) => ({
       handle?.addOverlay(createLineObject(vector(line.start), vector(line.end)));
     }
     set({ markups: [...get().markups, ...lines] });
+  },
+
+  setNavMode: (mode) => {
+    set({ navMode: mode });
+    useViewer.getState().handle?.setNavigationMode(mode);
+    if (mode === 'walk') {
+      log.info('Walk: drag to look around, W A S D or arrows to move, Q/E down/up, Shift faster.');
+    }
+  },
+
+  setEdges: (on) => {
+    set({ edges: on });
+    try {
+      localStorage.setItem(EDGES_KEY, on ? '1' : '0');
+    } catch {
+      // A setting that cannot be stored simply resets next time.
+    }
+    void showEdges(on);
   },
 
   addPlane: (point, normal) => {
@@ -395,10 +422,37 @@ export const useView = create<ViewState>((set, get) => ({
   },
 }));
 
-// A new or cleared model starts with no section, tints, measurements or markups.
+// A new or cleared model starts with no section, tints, measurements or markups, and
+// gets its edge lines when they are switched on.
 useModel.subscribe((state, previous) => {
-  if (state.model !== previous.model) useView.getState().reset();
+  if (state.model !== previous.model) {
+    useView.getState().reset();
+    if (state.model && useView.getState().edges) void showEdges(true);
+  }
 });
+
+const EDGES_KEY = 'kingpost.viewer.edges';
+
+function loadEdges(): boolean {
+  try {
+    return localStorage.getItem(EDGES_KEY) !== '0';
+  } catch {
+    return true;
+  }
+}
+
+/** Shows or hides edges on the loaded model, logging how long a first build took. */
+async function showEdges(on: boolean): Promise<void> {
+  const model = useModel.getState().model;
+  if (!model) return;
+  const started = performance.now();
+  const building = on && !model.edgesShown;
+  await model.setEdgesVisible(on);
+  useViewer.getState().handle?.render();
+  if (building && useModel.getState().model === model) {
+    log.info(`Edge lines drawn in ${Math.round(performance.now() - started)} ms`);
+  }
+}
 
 function vector(t: Triple): Vector3 {
   return new Vector3(t[0], t[1], t[2]);

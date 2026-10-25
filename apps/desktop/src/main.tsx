@@ -17,6 +17,7 @@ import { useUi } from './state/ui';
 import { useView } from './state/view';
 import { useViewer } from './state/viewer';
 import { useViews } from './state/views';
+import { useHistory } from './state/history';
 import './styles.css';
 
 const container = document.getElementById('root');
@@ -41,6 +42,7 @@ if (import.meta.env.DEV) {
       useView,
       useViewer,
       useViews,
+      useHistory,
     },
   });
 }

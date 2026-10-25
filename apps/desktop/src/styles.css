@@ -42,3 +42,33 @@ textarea,
 ::-webkit-scrollbar-track {
   background: transparent;
 }
+
+/* Orientation cube in the viewport corner. */
+.kp-viewcube-face {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--kp-edge);
+  background: color-mix(in srgb, var(--kp-surface) 88%, transparent);
+  color: var(--kp-fg-muted);
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  cursor: pointer;
+}
+.kp-viewcube-face:hover {
+  background: var(--kp-accent);
+  color: var(--kp-accent-fg);
+}
+.kp-viewcube-home {
+  border: 1px solid var(--kp-edge);
+  border-radius: 4px;
+  background: color-mix(in srgb, var(--kp-surface) 90%, transparent);
+  color: var(--kp-fg-muted);
+  font-size: 10px;
+  padding: 0 6px;
+  cursor: pointer;
+}
+.kp-viewcube-home:hover {
+  color: var(--kp-fg);
+}

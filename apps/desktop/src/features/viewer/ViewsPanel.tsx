@@ -5,8 +5,10 @@ import {
   Home,
   Palette,
   Pencil,
+  Play,
   RefreshCw,
   Scissors,
+  Square,
   Star,
   Trash2,
 } from 'lucide-react';
@@ -23,6 +25,9 @@ export function ViewsPanel() {
   const refresh = useViews((s) => s.refresh);
   const save = useViews((s) => s.save);
   const home = useViews((s) => s.home);
+  const playing = useViews((s) => s.playing);
+  const play = useViews((s) => s.play);
+  const stop = useViews((s) => s.stop);
   const project = useProject((s) => s.current);
   const [name, setName] = useState('');
 
@@ -40,6 +45,20 @@ export function ViewsPanel() {
     <div className="border-b border-edge px-3 py-2 text-xs">
       <div className="mb-1 flex items-center justify-between">
         <span className="font-semibold text-fg-muted">Views</span>
+        {views.length > 1 && (
+          <button
+            type="button"
+            className={cn(
+              'ml-auto mr-1 flex items-center gap-1 rounded px-1 py-0.5 text-[11px] hover:bg-surface-2',
+              playing ? 'text-accent' : 'text-fg-muted hover:text-fg',
+            )}
+            title={playing ? 'Stop the presentation' : 'Show the views one after another'}
+            onClick={() => (playing ? stop() : play())}
+          >
+            {playing ? <Square size={11} /> : <Play size={11} />}
+            {playing ? 'Stop' : 'Play'}
+          </button>
+        )}
         <button
           type="button"
           className="flex items-center gap-1 rounded px-1 py-0.5 text-[11px] text-fg-muted hover:bg-surface-2 hover:text-fg"

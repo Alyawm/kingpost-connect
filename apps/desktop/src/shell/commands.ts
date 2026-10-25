@@ -1,4 +1,5 @@
 import { useAppearance } from '../state/appearance';
+import { useHistory } from '../state/history';
 import { useModel } from '../state/model';
 import { useProject } from '../state/project';
 import { useUpdates } from '../state/updates';
@@ -128,7 +129,7 @@ export function listCommands(): Command[] {
                 },
                 {
                   id: 'selection.isolate',
-                  title: 'Isolate selected elements',
+                  title: 'Show only the selected elements',
                   group: 'Model',
                   shortcut: 'I',
                   run: () => model.isolate(selected),
@@ -142,6 +143,27 @@ export function listCommands(): Command[] {
                 },
               ]
             : []),
+          {
+            id: 'edit.undo',
+            title: 'Undo (visibility, colours, sections)',
+            group: 'Model',
+            shortcut: 'Ctrl+Z',
+            run: () => useHistory.getState().undo(),
+          },
+          {
+            id: 'edit.redo',
+            title: 'Redo',
+            group: 'Model',
+            shortcut: 'Ctrl+Y',
+            run: () => useHistory.getState().redo(),
+          },
+          {
+            id: 'edit.redo2',
+            title: 'Redo',
+            group: 'Model',
+            shortcut: 'Ctrl+Shift+Z',
+            run: () => useHistory.getState().redo(),
+          },
           {
             id: 'model.showAll',
             title: 'Show all elements',

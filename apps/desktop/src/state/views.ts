@@ -48,6 +48,11 @@ interface ViewsState {
   busy: boolean;
   /** The view last saved or applied, highlighted in the list. */
   activeId: string | null;
+  /** True while the views are being shown one after another. */
+  playing: boolean;
+  /** Shows every saved view in turn, like a presentation, until stopped. */
+  play(): void;
+  stop(): void;
   refresh(): Promise<void>;
   save(name: string): Promise<void>;
   /** Overwrites a view with what is on screen now. */
@@ -204,6 +209,30 @@ export const useViews = create<ViewsState>((set, get) => ({
   views: [],
   busy: false,
   activeId: null,
+  playing: false,
+
+  play: () => {
+    const views = get().views;
+    if (views.length === 0) return;
+    get().stop();
+    let index = Math.max(0, views.findIndex((v) => v.id === get().activeId) + 1) % views.length;
+    const next = () => {
+      const list = get().views;
+      if (!list.length) return get().stop();
+      const view = list[index % list.length]!;
+      get().apply(view);
+      index = (index + 1) % list.length;
+    };
+    next();
+    playTimer = setInterval(next, PLAY_SECONDS * 1000);
+    set({ playing: true });
+  },
+
+  stop: () => {
+    if (playTimer) clearInterval(playTimer);
+    playTimer = null;
+    if (get().playing) set({ playing: false });
+  },
 
   refresh: async () => {
     if (!useProject.getState().current) {
@@ -332,6 +361,9 @@ export const useViews = create<ViewsState>((set, get) => ({
     }
   },
 }));
+
+const PLAY_SECONDS = 3.5;
+let playTimer: ReturnType<typeof setInterval> | null = null;
 
 function parse<T>(json: string): T | null {
   try {

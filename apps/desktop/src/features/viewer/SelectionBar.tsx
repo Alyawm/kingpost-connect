@@ -30,6 +30,18 @@ export function SelectionBar() {
 
   const ids = useMemo(() => [...selectedIds], [selectedIds]);
   const common = useMemo(() => commonLook(looks, ids), [looks, ids]);
+  const model = useModel((s) => s.model);
+  // Overall size of the selection, so a member or a group can be checked at a glance.
+  const size = useMemo(() => {
+    const box = ids.length ? model?.boundsOf(ids) : null;
+    if (!box) return null;
+    const x = box.max.x - box.min.x;
+    const y = box.max.y - box.min.y;
+    const z = box.max.z - box.min.z;
+    const f = (v: number) => (v >= 10 ? v.toFixed(1) : v.toFixed(2));
+    // Viewer space is y-up: report plan width × plan depth × height.
+    return `${f(x)} × ${f(z)} × ${f(y)} m`;
+  }, [ids, model]);
   useEffect(() => {
     if (ids.length > 0) setEverSelected(true);
   }, [ids.length]);
@@ -71,6 +83,11 @@ export function SelectionBar() {
       >
         <span className="px-2 text-[11px] text-fg-muted">
           {ids.length.toLocaleString()} selected
+          {size && (
+            <span className="ml-2 font-mono" title="Width × depth × height of the selection">
+              {size}
+            </span>
+          )}
         </span>
         <Popover
           label="Colour and transparency"
@@ -94,7 +111,7 @@ export function SelectionBar() {
         <IconButton label="Hide (H)" size="sm" onClick={() => hide(ids)}>
           <EyeOff size={14} />
         </IconButton>
-        <IconButton label="Isolate (I)" size="sm" onClick={() => isolate(ids)}>
+        <IconButton label="Show only these (I)" size="sm" onClick={() => isolate(ids)}>
           <ScanSearch size={14} />
         </IconButton>
         <IconButton label="Ghost everything else (G)" size="sm" onClick={() => ghostOthers(ids)}>
