@@ -3,6 +3,7 @@ import { createRoot } from 'react-dom/client';
 import { TooltipProvider } from '@kingpost/ui';
 import { App } from './App';
 import { useAnalysis } from './state/analysis';
+import { useAppearance } from './state/appearance';
 import { useClash } from './state/clash';
 import { useCompare } from './state/compare';
 import { useDrawings } from './state/drawings';
@@ -26,6 +27,7 @@ if (import.meta.env.DEV) {
   Object.assign(window, {
     kingpost: {
       useAnalysis,
+      useAppearance,
       useClash,
       useCompare,
       useDrawings,

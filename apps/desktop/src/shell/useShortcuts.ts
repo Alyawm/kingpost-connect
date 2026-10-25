@@ -2,6 +2,7 @@ import { useEffect } from 'react';
 import { listCommands } from './commands';
 import { useUi } from '../state/ui';
 import { useView } from '../state/view';
+import { useModel } from '../state/model';
 
 function isTyping(target: EventTarget | null): boolean {
   if (!(target instanceof HTMLElement)) return false;
@@ -24,6 +25,10 @@ export function useShortcuts(): void {
 
       if (event.key === 'Escape' && useView.getState().tool !== 'select') {
         useView.getState().setTool('select');
+        return;
+      }
+      if (event.key === 'Escape' && useModel.getState().selectedIds.size > 0) {
+        void useModel.getState().select(null);
         return;
       }
 

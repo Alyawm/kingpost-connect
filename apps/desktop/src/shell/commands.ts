@@ -1,3 +1,5 @@
+import { useAppearance } from '../state/appearance';
+import { useModel } from '../state/model';
 import { useProject } from '../state/project';
 import { useUpdates } from '../state/updates';
 import { useUi, type Section } from '../state/ui';
@@ -31,6 +33,8 @@ export function listCommands(): Command[] {
   const ui = useUi.getState();
   const viewer = useViewer.getState();
   const project = useProject.getState();
+  const model = useModel.getState();
+  const selected = [...model.selectedIds];
 
   const sections = (Object.keys(sectionTitles) as Section[]).map<Command>((section) => ({
     id: `go.${section}`,
@@ -111,6 +115,48 @@ export function listCommands(): Command[] {
       shortcut: 'Ctrl+J',
       run: () => ui.togglePanel('bottom'),
     },
+    ...(model.model
+      ? [
+          ...(selected.length
+            ? [
+                {
+                  id: 'selection.hide',
+                  title: 'Hide selected elements',
+                  group: 'Model',
+                  shortcut: 'H',
+                  run: () => model.hide(selected),
+                },
+                {
+                  id: 'selection.isolate',
+                  title: 'Isolate selected elements',
+                  group: 'Model',
+                  shortcut: 'I',
+                  run: () => model.isolate(selected),
+                },
+                {
+                  id: 'selection.ghost',
+                  title: 'Ghost everything except the selection',
+                  group: 'Model',
+                  shortcut: 'G',
+                  run: () => useAppearance.getState().ghostOthers(selected),
+                },
+              ]
+            : []),
+          {
+            id: 'model.showAll',
+            title: 'Show all elements',
+            group: 'Model',
+            shortcut: 'Shift+H',
+            run: () => model.showAll(),
+          },
+          {
+            id: 'model.resetLooks',
+            title: 'Reset all colours and transparency',
+            group: 'Model',
+            run: () => useAppearance.getState().reset(),
+          },
+        ]
+      : []),
     ...sections,
   ];
 }

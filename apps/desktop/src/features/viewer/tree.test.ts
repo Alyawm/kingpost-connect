@@ -1,4 +1,4 @@
-import { NO_STOREY, buildTree, label, typeLabel } from './tree';
+import { NO_MATERIAL, NO_STOREY, NO_TYPE_NAME, buildTree, label, typeLabel } from './tree';
 import type { ElementSummary } from '../../lib/ipc';
 
 function element(partial: Partial<ElementSummary> & { express_id: number }): ElementSummary {
@@ -48,6 +48,40 @@ describe('buildTree', () => {
     ).toHaveLength(1);
     expect(buildTree(sample, 'column').flatMap((s) => s.types)[0]?.ifcType).toBe('IFCCOLUMN');
     expect(buildTree(sample, 'nothing here')).toHaveLength(0);
+  });
+});
+
+describe('buildTree grouping modes', () => {
+  const typed: ElementSummary[] = [
+    element({ express_id: 1, type_name: 'UB 406x178x54', material: 'S355' }),
+    element({ express_id: 2, type_name: 'UB 203x133x25', material: 'S355' }),
+    element({ express_id: 3, ifc_type: 'IFCCOLUMN', material: 'C40/50' }),
+    element({ express_id: 4, ifc_type: 'IFCSLAB' }),
+  ];
+
+  it('groups by IFC type, then type name', () => {
+    const tree = buildTree(typed, '', 'type');
+    expect(tree.map((g) => g.name)).toEqual(['Beams', 'Columns', 'Slabs']);
+    expect(tree[0]?.types.map((t) => t.label)).toEqual(['UB 203x133x25', 'UB 406x178x54']);
+    expect(tree[1]?.types[0]?.label).toBe(NO_TYPE_NAME);
+  });
+
+  it('groups by material, then type, with no material last', () => {
+    const tree = buildTree(typed, '', 'material');
+    expect(tree.map((g) => g.name)).toEqual(['C40/50', 'S355', NO_MATERIAL]);
+    expect(tree[1]?.types[0]?.label).toBe('Beams');
+    expect(tree[1]?.count).toBe(2);
+  });
+
+  it('keeps group keys distinct between modes', () => {
+    const keys = (g: 'storey' | 'type' | 'material') => buildTree(typed, '', g).map((x) => x.key);
+    expect(new Set([...keys('storey'), ...keys('type'), ...keys('material')]).size).toBe(
+      keys('storey').length + keys('type').length + keys('material').length,
+    );
+  });
+
+  it('filters by material too', () => {
+    expect(buildTree(typed, 'c40').flatMap((g) => g.types)).toHaveLength(1);
   });
 });
 

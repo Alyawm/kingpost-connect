@@ -2,53 +2,93 @@ import type { ElementSummary } from '../../lib/ipc';
 
 export interface TypeGroup {
   key: string;
+  /** The second-level value: an IFC type, or a type name when grouping by type. */
   ifcType: string;
+  /** Readable name of the second level. */
+  label: string;
   elements: ElementSummary[];
 }
 
 export interface StoreyGroup {
   key: string;
+  /** Readable name of the first level (a storey, type or material). */
   name: string;
   types: TypeGroup[];
   count: number;
 }
 
-export const NO_STOREY = '— no storey —';
+/** How the explorer groups elements: first level › second level. */
+export type GroupBy = 'storey' | 'type' | 'material';
 
-/** Groups product elements by storey, then by IFC type; spatial elements are the groups. */
-export function buildTree(elements: ElementSummary[], filter: string): StoreyGroup[] {
+export const GROUP_BY_LABELS: Record<GroupBy, string> = {
+  storey: 'Storey › Type',
+  type: 'Type › Type name',
+  material: 'Material › Type',
+};
+
+export const NO_STOREY = '— no storey —';
+export const NO_MATERIAL = '— no material —';
+export const NO_TYPE_NAME = '— no type name —';
+
+function levels(element: ElementSummary, groupBy: GroupBy): [string, string] {
+  switch (groupBy) {
+    case 'type':
+      return [element.ifc_type, element.type_name ?? NO_TYPE_NAME];
+    case 'material':
+      return [element.material ?? NO_MATERIAL, element.ifc_type];
+    default:
+      return [element.storey ?? NO_STOREY, element.ifc_type];
+  }
+}
+
+const isPlaceholder = (value: string) =>
+  value === NO_STOREY || value === NO_MATERIAL || value === NO_TYPE_NAME;
+
+/** Numeric-aware so "2.Floor" sorts before "10.Floor"; placeholders come last. */
+function compareKeys(a: string, b: string): number {
+  if (isPlaceholder(a) !== isPlaceholder(b)) return isPlaceholder(a) ? 1 : -1;
+  return a.localeCompare(b, undefined, { numeric: true, sensitivity: 'base' });
+}
+
+/**
+ * Groups product elements in two levels (by default storey, then IFC type); spatial
+ * elements are the groups, not members.
+ */
+export function buildTree(
+  elements: ElementSummary[],
+  filter: string,
+  groupBy: GroupBy = 'storey',
+): StoreyGroup[] {
   const needle = filter.trim().toLowerCase();
-  const storeys = new Map<string, Map<string, ElementSummary[]>>();
+  const groups = new Map<string, Map<string, ElementSummary[]>>();
   for (const element of elements) {
     if (element.is_spatial) continue;
     if (needle && !matches(element, needle)) continue;
-    const storey = element.storey ?? NO_STOREY;
-    const types = storeys.get(storey) ?? new Map<string, ElementSummary[]>();
-    types.set(element.ifc_type, [...(types.get(element.ifc_type) ?? []), element]);
-    storeys.set(storey, types);
+    const [first, second] = levels(element, groupBy);
+    const inner = groups.get(first) ?? new Map<string, ElementSummary[]>();
+    const list = inner.get(second);
+    if (list) list.push(element);
+    else inner.set(second, [element]);
+    groups.set(first, inner);
   }
-  // Numeric-aware so "2.Floor" sorts before "10.Floor"; unplaced elements come last.
-  return [...storeys.entries()]
+  return [...groups.entries()]
     .sort(([a], [b]) =>
-      a === NO_STOREY
-        ? 1
-        : b === NO_STOREY
-          ? -1
-          : a.localeCompare(b, undefined, { numeric: true, sensitivity: 'base' }),
+      groupBy === 'type' ? compareKeys(typeLabel(a), typeLabel(b)) : compareKeys(a, b),
     )
-    .map(([name, types]) => {
-      const typeGroups = [...types.entries()]
-        .sort(([a], [b]) => a.localeCompare(b))
-        .map(([ifcType, list]) => ({
-          key: `${name}/${ifcType}`,
-          ifcType,
+    .map(([name, inner]) => {
+      const typeGroups = [...inner.entries()]
+        .sort(([a], [b]) => compareKeys(a, b))
+        .map(([second, list]) => ({
+          key: `${groupBy}/${name}/${second}`,
+          ifcType: second,
+          label: groupBy === 'type' ? second : typeLabel(second),
           elements: list.sort((a, b) =>
             label(a).localeCompare(label(b), undefined, { numeric: true }),
           ),
         }));
       return {
-        key: name,
-        name,
+        key: `${groupBy}/${name}`,
+        name: groupBy === 'type' ? typeLabel(name) : name,
         types: typeGroups,
         count: typeGroups.reduce((n, g) => n + g.elements.length, 0),
       };
@@ -56,7 +96,14 @@ export function buildTree(elements: ElementSummary[], filter: string): StoreyGro
 }
 
 function matches(element: ElementSummary, needle: string): boolean {
-  return [element.name, element.tag, element.ifc_type, element.type_name, element.global_id]
+  return [
+    element.name,
+    element.tag,
+    element.ifc_type,
+    element.type_name,
+    element.material,
+    element.global_id,
+  ]
     .filter((v): v is string => !!v)
     .some((v) => v.toLowerCase().includes(needle));
 }
