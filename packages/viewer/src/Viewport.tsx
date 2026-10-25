@@ -4,6 +4,7 @@ import {
   type PickModifiers,
   type PickResult,
   type PointPick,
+  type ScreenRect,
   type ViewportHandle,
 } from './scene';
 
@@ -11,8 +12,14 @@ export interface ViewportProps {
   className?: string;
   /** Called with the picked object (null when the click hit nothing) and the modifier keys. */
   onSelect?: (hit: PickResult | null, modifiers: PickModifiers) => void;
-  /** Called with a surface point while the viewport is in point-pick mode. */
+  /** Called with a surface point (and its normal) while the viewport is in point-pick mode. */
   onPickPoint?: (pick: PointPick) => void;
+  /** Called while a section plane handle is dragged, with the plane's new point. */
+  onClipPlaneMove?: (id: string, point: [number, number, number]) => void;
+  /** Called when a section plane handle is clicked. */
+  onClipPlaneSelect?: (id: string) => void;
+  /** Called when a Shift+drag selection box is released. */
+  onBoxSelect?: (rect: ScreenRect, crossing: boolean, modifiers: PickModifiers) => void;
   /** Called with the handle once the scene exists, and with null before it is torn down. */
   onReady?: (handle: ViewportHandle | null) => void;
 }
@@ -21,27 +28,33 @@ export interface ViewportProps {
  * A full-size canvas owned by one SceneController. The controller is created once per
  * mount; callbacks are read through refs so that re-renders never rebuild the scene.
  */
-export function Viewport({ className, onSelect, onPickPoint, onReady }: ViewportProps) {
+export function Viewport(props: ViewportProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
-  const onSelectRef = useRef(onSelect);
-  const onPickPointRef = useRef(onPickPoint);
-  const onReadyRef = useRef(onReady);
+  const propsRef = useRef(props);
 
   useEffect(() => {
-    onSelectRef.current = onSelect;
-    onPickPointRef.current = onPickPoint;
-    onReadyRef.current = onReady;
+    propsRef.current = props;
   });
 
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
     const controller = new SceneController(canvas);
-    controller.onPick = (hit, modifiers) => onSelectRef.current?.(hit, modifiers);
-    controller.onPickPoint = (pick) => onPickPointRef.current?.(pick);
-    onReadyRef.current?.(controller);
+    controller.onPick = (hit, modifiers) => propsRef.current.onSelect?.(hit, modifiers);
+    controller.onPickPoint = (pick) => propsRef.current.onPickPoint?.(pick);
+    controller.onClipPlaneMove = (id, point) => propsRef.current.onClipPlaneMove?.(id, point);
+    controller.onClipPlaneSelect = (id) => propsRef.current.onClipPlaneSelect?.(id);
+    controller.onBoxSelect = (rect, crossing, modifiers) =>
+      propsRef.current.onBoxSelect?.(rect, crossing, modifiers);
+    // The middle button pans; stop the browser's auto-scroll from starting as well.
+    const noAutoScroll = (event: MouseEvent) => {
+      if (event.button === 1) event.preventDefault();
+    };
+    canvas.addEventListener('mousedown', noAutoScroll);
+    propsRef.current.onReady?.(controller);
     return () => {
-      onReadyRef.current?.(null);
+      canvas.removeEventListener('mousedown', noAutoScroll);
+      propsRef.current.onReady?.(null);
       controller.dispose();
     };
   }, []);
@@ -49,7 +62,7 @@ export function Viewport({ className, onSelect, onPickPoint, onReady }: Viewport
   return (
     <canvas
       ref={canvasRef}
-      className={className}
+      className={props.className}
       style={{ display: 'block', width: '100%', height: '100%', touchAction: 'none' }}
     />
   );

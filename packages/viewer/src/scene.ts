@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import type { AnalysisLayer } from './analysis';
+import { ClipGizmos, closestOnLine, toThreePlane, type ClipPlaneSpec } from './clip';
 
 /** What the viewport reports when the user clicks an object. */
 export interface PickResult {
@@ -13,20 +14,22 @@ export interface PickResult {
 
 export type ViewDirection = 'iso' | 'top' | 'front' | 'back' | 'left' | 'right';
 
-/** An axis-aligned section plane in world metres. */
-export interface SectionSpec {
-  axis: 'x' | 'y' | 'z';
-  position: number;
-  /** false keeps the side below/behind the plane; true keeps the other side. */
-  flip: boolean;
-}
-
 export type PickMode = 'select' | 'point';
 
 /** A world-space point picked on the model surface. */
 export interface PointPick {
   point: THREE.Vector3;
+  /** World-space normal of the face that was hit, facing the camera. */
+  normal?: THREE.Vector3;
   expressId?: number;
+}
+
+/** A screen rectangle in normalised device coordinates (-1..1), for box selection. */
+export interface ScreenRect {
+  x0: number;
+  y0: number;
+  x1: number;
+  y1: number;
 }
 
 /** Keyboard state at the moment of a click, for multi-selection. */
@@ -62,7 +65,10 @@ export interface ViewportHandle {
   contentBounds(): THREE.Box3;
   /** Extent of the content along one axis, for section sliders. */
   extent(axis: 'x' | 'y' | 'z'): { min: number; max: number };
-  setSection(section: SectionSpec | null): void;
+  /** Section planes (all enabled ones cut), the one being edited, and whether handles show. */
+  setClipPlanes(planes: ClipPlaneSpec[], activeId: string | null, showHandles: boolean): void;
+  /** The camera, for projecting elements during box selection. */
+  getCameraObject(): THREE.Camera;
   select(object: THREE.Mesh | null): void;
   render(): void;
 }
@@ -105,6 +111,28 @@ export class SceneController implements ViewportHandle {
 
   onPick: ((hit: PickResult | null, modifiers: PickModifiers) => void) | null = null;
   onPickPoint: ((pick: PointPick) => void) | null = null;
+  /** A plane handle was dragged; `point` is the plane's new point. */
+  onClipPlaneMove: ((id: string, point: [number, number, number]) => void) | null = null;
+  /** A plane handle was clicked without dragging. */
+  onClipPlaneSelect: ((id: string) => void) | null = null;
+  /** Shift+drag finished: crossing when dragged right to left (CAD convention). */
+  onBoxSelect: ((rect: ScreenRect, crossing: boolean, modifiers: PickModifiers) => void) | null =
+    null;
+  private readonly gizmos = new ClipGizmos();
+  private clipPlanes: ClipPlaneSpec[] = [];
+  private activeClipId: string | null = null;
+  private showClipHandles = true;
+  private drag:
+    | {
+        kind: 'plane';
+        id: string;
+        origin: THREE.Vector3;
+        normal: THREE.Vector3;
+        t0: number;
+        moved: boolean;
+      }
+    | { kind: 'box'; x: number; y: number; el: HTMLDivElement }
+    | null = null;
   private pickMode: PickMode = 'select';
 
   private readonly raycaster = new THREE.Raycaster();
@@ -133,6 +161,13 @@ export class SceneController implements ViewportHandle {
     this.controls = new OrbitControls(this.camera, canvas);
     this.controls.enableDamping = false;
     this.controls.screenSpacePanning = true;
+    // Left orbits; middle and right pan; the wheel zooms towards the cursor.
+    this.controls.mouseButtons = {
+      LEFT: THREE.MOUSE.ROTATE,
+      MIDDLE: THREE.MOUSE.PAN,
+      RIGHT: THREE.MOUSE.PAN,
+    };
+    this.controls.zoomToCursor = true;
     this.controls.addEventListener('change', this.requestRender);
 
     this.scene.add(new THREE.HemisphereLight(0xffffff, 0x3a4250, 1.1));
@@ -159,7 +194,9 @@ export class SceneController implements ViewportHandle {
       attributeFilter: ['data-theme'],
     });
 
-    canvas.addEventListener('pointerdown', this.onPointerDown);
+    // Capture phase: runs before OrbitControls so a handle drag or box select can claim it.
+    canvas.addEventListener('pointerdown', this.onPointerDown, { capture: true });
+    canvas.addEventListener('pointermove', this.onPointerMove);
     canvas.addEventListener('pointerup', this.onPointerUp);
 
     this.resize();
@@ -271,23 +308,25 @@ export class SceneController implements ViewportHandle {
     return { min: box.min[axis], max: box.max[axis] };
   }
 
-  /** One global section plane, or none. */
-  setSection(section: SectionSpec | null): void {
-    if (!section) {
-      this.renderer.clippingPlanes = [];
-    } else {
-      const normal = new THREE.Vector3(
-        section.axis === 'x' ? 1 : 0,
-        section.axis === 'y' ? 1 : 0,
-        section.axis === 'z' ? 1 : 0,
-      );
-      // A plane keeps points where normal·p + constant >= 0; unflipped keeps the lower side.
-      this.renderer.clippingPlanes = [
-        section.flip
-          ? new THREE.Plane(normal, -section.position)
-          : new THREE.Plane(normal.negate(), section.position),
-      ];
-    }
+  setClipPlanes(planes: ClipPlaneSpec[], activeId: string | null, showHandles: boolean): void {
+    this.clipPlanes = planes.map((p) => ({ ...p }));
+    this.activeClipId = activeId;
+    this.showClipHandles = showHandles;
+    this.applyClipPlanes();
+  }
+
+  getCameraObject(): THREE.Camera {
+    return this.camera;
+  }
+
+  private applyClipPlanes(): void {
+    this.renderer.clippingPlanes = this.clipPlanes.filter((p) => p.enabled).map(toThreePlane);
+    this.gizmos.update(
+      this.clipPlanes,
+      this.activeClipId,
+      this.contentBounds(),
+      this.showClipHandles && this.clipPlanes.length > 0,
+    );
     this.requestRender();
   }
 
@@ -332,8 +371,10 @@ export class SceneController implements ViewportHandle {
     cancelAnimationFrame(this.frame);
     this.resizeObserver.disconnect();
     this.themeObserver.disconnect();
-    this.canvas.removeEventListener('pointerdown', this.onPointerDown);
+    this.canvas.removeEventListener('pointerdown', this.onPointerDown, { capture: true });
+    this.canvas.removeEventListener('pointermove', this.onPointerMove);
     this.canvas.removeEventListener('pointerup', this.onPointerUp);
+    this.gizmos.dispose();
     this.controls.removeEventListener('change', this.requestRender);
     this.controls.dispose();
     this.clear();
@@ -346,6 +387,15 @@ export class SceneController implements ViewportHandle {
     this.frame = requestAnimationFrame(() => {
       this.frame = 0;
       this.renderer.render(this.scene, this.camera);
+      if (this.gizmos.scene.children.length > 0) {
+        // Plane handles are drawn on top without being cut by the planes themselves.
+        const planes = this.renderer.clippingPlanes;
+        this.renderer.clippingPlanes = [];
+        this.renderer.autoClear = false;
+        this.renderer.render(this.gizmos.scene, this.camera);
+        this.renderer.autoClear = true;
+        this.renderer.clippingPlanes = planes;
+      }
     });
   };
 
@@ -367,12 +417,121 @@ export class SceneController implements ViewportHandle {
     this.requestRender();
   }
 
+  private pointerNdc(event: PointerEvent): THREE.Vector2 {
+    const rect = this.canvas.getBoundingClientRect();
+    return new THREE.Vector2(
+      ((event.clientX - rect.left) / rect.width) * 2 - 1,
+      -((event.clientY - rect.top) / rect.height) * 2 + 1,
+    );
+  }
+
   private readonly onPointerDown = (event: PointerEvent): void => {
     if (event.button !== 0) return;
     this.pointerDown = { x: event.clientX, y: event.clientY };
+
+    // A section handle under the pointer: drag it along its normal.
+    if (this.showClipHandles && this.clipPlanes.length > 0) {
+      this.raycaster.setFromCamera(this.pointerNdc(event), this.camera);
+      const id = this.gizmos.hit(this.raycaster);
+      const plane = id ? this.clipPlanes.find((p) => p.id === id) : undefined;
+      if (plane) {
+        const origin = new THREE.Vector3(...plane.point);
+        const normal = new THREE.Vector3(...plane.normal).normalize();
+        this.drag = {
+          kind: 'plane',
+          id: plane.id,
+          origin,
+          normal,
+          t0: closestOnLine(this.raycaster.ray, origin, normal),
+          moved: false,
+        };
+        this.controls.enabled = false;
+        this.canvas.setPointerCapture?.(event.pointerId);
+        return;
+      }
+    }
+
+    // Shift+drag draws a selection box instead of orbiting.
+    if (event.shiftKey && this.pickMode === 'select') {
+      const host = this.canvas.parentElement ?? document.body;
+      const el = document.createElement('div');
+      el.style.cssText =
+        'position:absolute;pointer-events:none;border:1px solid #5b9dff;background:rgba(91,157,255,0.12);z-index:5';
+      host.appendChild(el);
+      this.drag = { kind: 'box', x: event.clientX, y: event.clientY, el };
+      this.controls.enabled = false;
+      this.canvas.setPointerCapture?.(event.pointerId);
+    }
   };
 
+  private readonly onPointerMove = (event: PointerEvent): void => {
+    const drag = this.drag;
+    if (!drag) return;
+    if (drag.kind === 'plane') {
+      this.raycaster.setFromCamera(this.pointerNdc(event), this.camera);
+      const t = closestOnLine(this.raycaster.ray, drag.origin, drag.normal);
+      const point = drag.origin.clone().addScaledVector(drag.normal, t - drag.t0);
+      const plane = this.clipPlanes.find((p) => p.id === drag.id);
+      if (!plane) return;
+      drag.moved = true;
+      plane.point = point.toArray() as [number, number, number];
+      this.activeClipId = drag.id;
+      this.applyClipPlanes();
+      this.onClipPlaneMove?.(drag.id, plane.point);
+      return;
+    }
+    const host = (this.canvas.parentElement ?? document.body).getBoundingClientRect();
+    const left = Math.min(drag.x, event.clientX) - host.left;
+    const top = Math.min(drag.y, event.clientY) - host.top;
+    Object.assign(drag.el.style, {
+      left: `${left}px`,
+      top: `${top}px`,
+      width: `${Math.abs(event.clientX - drag.x)}px`,
+      height: `${Math.abs(event.clientY - drag.y)}px`,
+      borderStyle: event.clientX < drag.x ? 'dashed' : 'solid',
+    });
+  };
+
+  /** Ends a handle drag or box selection; true when the event was consumed. */
+  private finishDrag(event: PointerEvent): boolean {
+    const drag = this.drag;
+    if (!drag) return false;
+    this.drag = null;
+    this.controls.enabled = true;
+    if (this.canvas.hasPointerCapture?.(event.pointerId)) {
+      this.canvas.releasePointerCapture(event.pointerId);
+    }
+    if (drag.kind === 'plane') {
+      if (!drag.moved) {
+        this.activeClipId = drag.id;
+        this.applyClipPlanes();
+        this.onClipPlaneSelect?.(drag.id);
+      }
+      return true;
+    }
+    drag.el.remove();
+    const moved = Math.hypot(event.clientX - drag.x, event.clientY - drag.y);
+    if (moved <= CLICK_TOLERANCE_PX) return false; // a Shift+click selects as usual
+    const rect = this.canvas.getBoundingClientRect();
+    const ndc = (x: number, y: number): [number, number] => [
+      ((x - rect.left) / rect.width) * 2 - 1,
+      -((y - rect.top) / rect.height) * 2 + 1,
+    ];
+    const [ax, ay] = ndc(drag.x, drag.y);
+    const [bx, by] = ndc(event.clientX, event.clientY);
+    this.onBoxSelect?.(
+      { x0: Math.min(ax, bx), y0: Math.min(ay, by), x1: Math.max(ax, bx), y1: Math.max(ay, by) },
+      event.clientX < drag.x,
+      { ctrl: event.ctrlKey || event.metaKey, shift: event.shiftKey },
+    );
+    return true;
+  }
+
   private readonly onPointerUp = (event: PointerEvent): void => {
+    if (this.finishDrag(event)) {
+      this.pointerDown = null;
+      return;
+    }
     const start = this.pointerDown;
     this.pointerDown = null;
     if (!start || event.button !== 0) return;
@@ -385,9 +544,13 @@ export class SceneController implements ViewportHandle {
       -((event.clientY - rect.top) / rect.height) * 2 + 1,
     );
     this.raycaster.setFromCamera(pointer, this.camera);
-    const hit = this.raycaster
-      .intersectObjects(this.content.children, true)
-      .find((h) => (h.object as THREE.Mesh).isMesh && visibleInTree(h.object));
+    const hit = this.raycaster.intersectObjects(this.content.children, true).find(
+      (h) =>
+        (h.object as THREE.Mesh).isMesh &&
+        visibleInTree(h.object) &&
+        // Parts cut away by a section plane cannot be picked.
+        this.renderer.clippingPlanes.every((plane) => plane.distanceToPoint(h.point) >= -1e-4),
+    );
 
     // Analysis members are lines inside the solids they model; a line hit that is not
     // clearly behind the mesh hit wins, otherwise members could never be picked.
@@ -407,8 +570,14 @@ export class SceneController implements ViewportHandle {
       if (!hit) return;
       const pickable = hit.object.userData as PickableUserData;
       const resolved = pickable.resolvePick?.(hit.faceIndex ?? 0);
+      const normal = hit.face
+        ? hit.face.normal.clone().transformDirection(hit.object.matrixWorld).normalize()
+        : undefined;
+      // Faces are double-sided: make the normal face the camera.
+      if (normal && normal.dot(this.raycaster.ray.direction) > 0) normal.negate();
       this.onPickPoint?.({
         point: hit.point.clone(),
+        ...(normal ? { normal } : {}),
         ...(resolved?.expressId !== undefined ? { expressId: resolved.expressId } : {}),
       });
       return;

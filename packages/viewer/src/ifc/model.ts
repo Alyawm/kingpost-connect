@@ -351,6 +351,99 @@ export class IfcModel {
     };
   }
 
+  /** Per-element world bounds as flat min/max arrays, computed once on first use. */
+  private elementBoxes: Map<number, Float32Array> | null = null;
+
+  private boxes(): Map<number, Float32Array> {
+    if (this.elementBoxes) return this.elementBoxes;
+    this.group.updateMatrixWorld(true);
+    const out = new Map<number, Float32Array>();
+    const point = new THREE.Vector3();
+    for (const [id, parts] of this.partsOf) {
+      const b = new Float32Array([Infinity, Infinity, Infinity, -Infinity, -Infinity, -Infinity]);
+      for (const { bucket, range } of parts) {
+        const positions = bucket.mesh.geometry.getAttribute('position');
+        const end = range.vertexStart + range.vertexCount;
+        for (let i = range.vertexStart; i < end; i++) {
+          point.fromBufferAttribute(positions, i).applyMatrix4(bucket.mesh.matrixWorld);
+          if (point.x < b[0]!) b[0] = point.x;
+          if (point.y < b[1]!) b[1] = point.y;
+          if (point.z < b[2]!) b[2] = point.z;
+          if (point.x > b[3]!) b[3] = point.x;
+          if (point.y > b[4]!) b[4] = point.y;
+          if (point.z > b[5]!) b[5] = point.z;
+        }
+      }
+      if (b[0]! <= b[3]!) out.set(id, b);
+    }
+    this.elementBoxes = out;
+    return out;
+  }
+
+  /**
+   * Elements inside a screen rectangle (normalised device coordinates). A window selection
+   * takes elements whose whole box projects inside; a crossing selection takes any that
+   * overlaps. Hidden and fully transparent elements, and elements behind the camera, are
+   * skipped, as are those entirely cut away by `keep` planes.
+   */
+  idsInScreenRect(
+    camera: THREE.Camera,
+    rect: { x0: number; y0: number; x1: number; y1: number },
+    crossing: boolean,
+    keep: THREE.Plane[] = [],
+  ): number[] {
+    camera.updateMatrixWorld();
+    const viewProjection = new THREE.Matrix4().multiplyMatrices(
+      camera.projectionMatrix,
+      camera.matrixWorldInverse,
+    );
+    const corner = new THREE.Vector3();
+    const box = new THREE.Box3();
+    const result: number[] = [];
+    for (const [id, b] of this.boxes()) {
+      if (this.hidden.has(id) || this.opacityOf(id) < INVISIBLE) continue;
+      box.min.set(b[0]!, b[1]!, b[2]!);
+      box.max.set(b[3]!, b[4]!, b[5]!);
+      // Fully cut away: even the box corner furthest along the kept side is removed.
+      const cutAway = keep.some((plane) => {
+        const n = plane.normal;
+        const far =
+          n.x * (n.x >= 0 ? box.max.x : box.min.x) +
+          n.y * (n.y >= 0 ? box.max.y : box.min.y) +
+          n.z * (n.z >= 0 ? box.max.z : box.min.z) +
+          plane.constant;
+        return far < 0;
+      });
+      if (cutAway) continue;
+      let minX = Infinity,
+        minY = Infinity,
+        maxX = -Infinity,
+        maxY = -Infinity;
+      let behind = false;
+      for (let i = 0; i < 8; i++) {
+        corner.set(i & 1 ? b[3]! : b[0]!, i & 2 ? b[4]! : b[1]!, i & 4 ? b[5]! : b[2]!);
+        corner.applyMatrix4(viewProjection);
+        // applyMatrix4 divides by w; a corner behind the camera has w < 0 and flips.
+        const w =
+          viewProjection.elements[3]! * (i & 1 ? b[3]! : b[0]!) +
+          viewProjection.elements[7]! * (i & 2 ? b[4]! : b[1]!) +
+          viewProjection.elements[11]! * (i & 4 ? b[5]! : b[2]!) +
+          viewProjection.elements[15]!;
+        if (w <= 0) behind = true;
+        if (corner.x < minX) minX = corner.x;
+        if (corner.y < minY) minY = corner.y;
+        if (corner.x > maxX) maxX = corner.x;
+        if (corner.y > maxY) maxY = corner.y;
+      }
+      if (behind) continue;
+      const inside = crossing
+        ? maxX >= rect.x0 && minX <= rect.x1 && maxY >= rect.y0 && minY <= rect.y1
+        : minX >= rect.x0 && maxX <= rect.x1 && minY >= rect.y0 && maxY <= rect.y1;
+      if (inside) result.push(id);
+    }
+    return result;
+  }
+
   /** World-space bounds of the given elements, or null when none has geometry. */
   boundsOf(ids: Iterable<number>): THREE.Box3 | null {
     this.group.updateMatrixWorld(true);

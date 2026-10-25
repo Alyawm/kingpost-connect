@@ -8,11 +8,19 @@ export {
   type PickModifiers,
   type PickResult,
   type PointPick,
-  type SectionSpec,
+  type ScreenRect,
   type ViewDirection,
   type ViewportHandle,
 } from './scene';
 export { createSampleFrame } from './sample';
+export {
+  extentAlong,
+  planeOffset,
+  snapToAxis,
+  toThreePlane,
+  withOffset,
+  type ClipPlaneSpec,
+} from './clip';
 export { loadIfcToGroup, type IfcLoadStats, type IfcLoadResult } from './ifc/load';
 export { IfcModel, type ElementAppearance, type ElementRange, type MeshBucket } from './ifc/model';
 export {
