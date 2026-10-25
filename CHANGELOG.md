@@ -3,6 +3,21 @@
 All notable changes to KingPost Connect. The format follows Keep a Changelog; versions
 follow semantic versioning. Milestone tags match the headings below.
 
+## [1.6.0] — 2026-10-25 — Title bar, toolbar and Projects page
+
+### Added
+- Title bar with the project and model, Projects, commands, help, settings and theme.
+- Main toolbar across the window with larger icons: select, box select, hide, show only,
+  ghost, show all, colour, fit all, fit selection, edges, measure, section, markup,
+  clear, new issue from the selection, save view, undo, redo, navigation modes, focus.
+- Box select as a tool (left drag draws the box), besides Shift+drag.
+- Projects page, shown whenever no project is open and from the title bar: pinned and
+  recent projects with last-opened times, search, pin and remove, open, new, sample.
+
+### Changed
+- Viewport overlay keeps only the tool hint, the measure panel and the orientation cube;
+  the status bar keeps status and panel toggles.
+
 ## [1.5.0] — 2026-10-25 — Several models and measuring
 
 ### Added

@@ -17,6 +17,21 @@ the folder for changes. Recently opened projects are listed on the welcome scree
 Supported files: IFC (2x3 and 4) for models, PDF for drawing sets, ETABS `.e2k`, SAP2000
 `.s2k` and SAF `.xlsx` for analysis models.
 
+## Window and Projects page
+
+The title bar shows the open project and model; **Projects** opens the Projects page,
+which is also what the application shows whenever no project is open (so it is the first
+thing a new user sees). It lists pinned projects and recent ones with when each was last
+opened; pin or remove a project from its card, search by name or folder, open a project
+folder, start a new one in any folder, or open the sample project. Commands, help,
+settings and the theme are on the right of the title bar.
+
+Under the title bar the main toolbar holds the viewer tools, left to right: select and
+box select; hide, show only, ghost the rest, show all and colour/transparency (for the
+selection); fit all, fit selection and edge lines; measure, section, markup and clear;
+new issue from the selection and save the view; undo and redo. On the right: orbit, pan
+and walk, and focus mode (hide the panels).
+
 ## Sample project
 
 On the welcome screen, **Try the sample project** creates a "KingPost Sample" folder in
