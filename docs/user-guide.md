@@ -17,6 +17,13 @@ the folder for changes. Recently opened projects are listed on the welcome scree
 Supported files: IFC (2x3 and 4) for models, PDF for drawing sets, ETABS `.e2k`, SAP2000
 `.s2k` and SAF `.xlsx` for analysis models.
 
+## Sample project
+
+On the welcome screen, **Try the sample project** creates a "KingPost Sample" folder in
+your Documents with a small sample building, imports it and opens it in the viewer. The
+frame shown when the application starts is only a picture; colour, transparency, hide
+and views need a model loaded from a project like this one.
+
 ## Models
 
 **Import** reads an IFC file into the database as a revision: every element with its

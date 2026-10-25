@@ -3,6 +3,18 @@
 All notable changes to KingPost Connect. The format follows Keep a Changelog; versions
 follow semantic versioning. Milestone tags match the headings below.
 
+## [1.2.1] — 2026-10-25 — Sample project
+
+### Added
+- "Try the sample project" on the welcome screen: creates a "KingPost Sample" folder in
+  Documents with a bundled sample building, imports it and shows it, so the colour,
+  transparency, hide and views tools can be tried straight after installing.
+- Clicking the start-up demo frame explains that it is not an editable model and offers
+  the sample project; a first-use tip says how to select elements once a model is loaded.
+
+### Fixed
+- The inspector kept showing a pick from the demo frame after a model was loaded.
+
 ## [1.2.0] — 2026-10-25 — Element appearance and views
 
 ### Added
