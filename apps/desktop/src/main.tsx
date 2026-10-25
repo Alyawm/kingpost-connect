@@ -21,6 +21,7 @@ import { useHistory } from './state/history';
 import { useFederation } from './state/federation';
 import { useMeasure } from './state/measure';
 import { useNotes } from './state/notes';
+import { useGrids } from './state/grids';
 import './styles.css';
 
 const container = document.getElementById('root');
@@ -49,6 +50,7 @@ if (import.meta.env.DEV) {
       useFederation,
       useMeasure,
       useNotes,
+      useGrids,
     },
   });
 }

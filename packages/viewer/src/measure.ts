@@ -284,3 +284,86 @@ export function createNoteObject(point: THREE.Vector3, text: string, span: numbe
   group.add(sprite);
   return group;
 }
+
+const GRID_COLOR = 0x3f7fd9;
+
+/** A grid bubble: the axis tag in a circle, constant size on screen. */
+function bubbleSprite(tag: string): THREE.Sprite {
+  const canvas = document.createElement('canvas');
+  canvas.width = 96;
+  canvas.height = 96;
+  const context = canvas.getContext('2d');
+  if (context) {
+    context.beginPath();
+    context.arc(48, 48, 42, 0, Math.PI * 2);
+    context.fillStyle = 'rgba(255, 255, 255, 0.95)';
+    context.fill();
+    context.lineWidth = 5;
+    context.strokeStyle = '#3f7fd9';
+    context.stroke();
+    context.font = `600 ${tag.length > 2 ? 28 : 38}px "Segoe UI", system-ui, sans-serif`;
+    context.fillStyle = '#1d4f99';
+    context.textAlign = 'center';
+    context.textBaseline = 'middle';
+    context.fillText(tag, 48, 50);
+  }
+  const texture = new THREE.CanvasTexture(canvas);
+  texture.colorSpace = THREE.SRGBColorSpace;
+  const sprite = new THREE.Sprite(
+    new THREE.SpriteMaterial({
+      map: texture,
+      depthTest: false,
+      transparent: true,
+      sizeAttenuation: false,
+    }),
+  );
+  sprite.scale.set(LABEL_SIZE * 1.3, LABEL_SIZE * 1.3, 1);
+  sprite.renderOrder = 12;
+  return sprite;
+}
+
+/** Grid axes as lines with a tagged bubble beyond each end. */
+export function createGridObject(
+  axes: { tag: string; start: THREE.Vector3; end: THREE.Vector3 }[],
+  span: number,
+): THREE.Group {
+  const group = new THREE.Group();
+  group.name = 'grid';
+  const reach = Math.max(span * 0.015, 0.5);
+  const positions: number[] = [];
+  for (const axis of axes) {
+    const dir = axis.end.clone().sub(axis.start);
+    if (dir.lengthSq() < 1e-9) continue;
+    dir.normalize();
+    const a = axis.start.clone().addScaledVector(dir, -reach);
+    const b = axis.end.clone().addScaledVector(dir, reach);
+    positions.push(...a.toArray(), ...b.toArray());
+    if (axis.tag) {
+      for (const [at, sign] of [
+        [a, -1],
+        [b, 1],
+      ] as const) {
+        const bubble = bubbleSprite(axis.tag);
+        bubble.position.copy(at).addScaledVector(dir, sign * reach * 0.6);
+        group.add(bubble);
+      }
+    }
+  }
+  const lines = new THREE.LineSegments(
+    new THREE.BufferGeometry().setAttribute(
+      'position',
+      new THREE.Float32BufferAttribute(positions, 3),
+    ),
+    new THREE.LineDashedMaterial({
+      color: GRID_COLOR,
+      dashSize: Math.max(span * 0.01, 0.4),
+      gapSize: Math.max(span * 0.004, 0.15),
+      transparent: true,
+      opacity: 0.85,
+    }),
+  );
+  lines.computeLineDistances();
+  lines.renderOrder = 9;
+  group.add(lines);
+  return group;
+}

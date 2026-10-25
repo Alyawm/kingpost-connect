@@ -11,10 +11,12 @@
 use std::{io, path::PathBuf, time::Instant};
 
 mod extract;
+pub mod grids;
 mod import;
 pub mod model;
 pub mod step;
 
+pub use grids::{Grid, GridAxis, read_grids};
 pub use import::{ImportSummary, import_file, import_model};
 pub use model::{Element, IfcModel, ParseStats, Property, Units};
 pub use step::{StepError, StepFile, Value};

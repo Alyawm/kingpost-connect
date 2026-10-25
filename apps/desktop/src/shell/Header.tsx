@@ -10,6 +10,7 @@ import {
   Focus,
   Footprints,
   Ghost,
+  Grid3x3,
   Hand,
   ImageDown,
   LayoutGrid,
@@ -36,6 +37,7 @@ import { IconButton, Kbd, Popover, cn } from '@kingpost/ui';
 import type { NavigationMode } from '@kingpost/viewer';
 import { useAppearance } from '../state/appearance';
 import { useHistory } from '../state/history';
+import { useGrids } from '../state/grids';
 import { useMeasure } from '../state/measure';
 import { useModel } from '../state/model';
 import { useProject } from '../state/project';
@@ -181,6 +183,9 @@ export function MainToolbar() {
   const redo = useHistory((s) => s.redo);
   const saveView = useViews((s) => s.save);
   const exportImage = useViews((s) => s.exportImage);
+  const gridsVisible = useGrids((s) => s.visible);
+  const gridsLoading = useGrids((s) => s.loading);
+  const toggleGrids = useGrids((s) => s.toggle);
   const viewCount = useViews((s) => s.views.length);
   const requestNewIssue = useReview((s) => s.requestNewIssue);
   const leftOpen = useUi((s) => s.leftOpen);
@@ -287,6 +292,14 @@ export function MainToolbar() {
           onClick={() => fitTo(ids)}
         >
           <Focus size={ICON} />
+        </IconButton>
+        <IconButton
+          label={gridsVisible ? 'Hide grids' : 'Show grids (from the IFC file)'}
+          active={gridsVisible}
+          disabled={!hasModel || gridsLoading}
+          onClick={() => void toggleGrids()}
+        >
+          <Grid3x3 size={ICON} />
         </IconButton>
         <IconButton
           label={edges ? 'Hide edge lines' : 'Show edge lines'}

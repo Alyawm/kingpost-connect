@@ -310,6 +310,22 @@ pub fn project_add_files(
     })
 }
 
+/// The structural grids of an IFC file in the project, in metres in IFC world coordinates.
+#[tauri::command]
+pub async fn ifc_grids(
+    state: State<'_, AppState>,
+    rel_path: String,
+) -> Result<Vec<kp_ifc::Grid>, String> {
+    let path = state.with_project(|project| resolve_in_root(project.root(), &rel_path))?;
+    tauri::async_runtime::spawn_blocking(move || {
+        let bytes = fs::read(&path).map_err(|e| format!("{}: {e}", path.display()))?;
+        let step = kp_ifc::StepFile::parse(&bytes).map_err(describe)?;
+        Ok(kp_ifc::read_grids(&step))
+    })
+    .await
+    .map_err(|e| format!("grid thread failed: {e}"))?
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

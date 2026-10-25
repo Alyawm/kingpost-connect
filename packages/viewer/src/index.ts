@@ -53,6 +53,7 @@ export {
   createPerpendicularObject,
   createPointObject,
   createNoteObject,
+  createGridObject,
   formatDistance,
   measure,
   type Measurement,

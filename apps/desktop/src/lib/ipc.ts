@@ -1325,3 +1325,24 @@ export function linkOpen(kind: 'url' | 'file', target: string): Promise<void> {
 export function imageSave(path: string, data: string): Promise<number> {
   return invoke<number>('image_save', { path, data });
 }
+
+// ---- Structural grids ----
+
+export interface GridAxisRow {
+  tag: string;
+  family: 'u' | 'v' | 'w';
+  /** IFC world coordinates in metres. */
+  start: Triple;
+  end: Triple;
+}
+
+export interface GridRow {
+  global_id: string;
+  name: string | null;
+  axes: GridAxisRow[];
+}
+
+export function ifcGrids(relPath: string): Promise<GridRow[]> {
+  if (!isTauri()) return Promise.resolve([]);
+  return invoke<GridRow[]>('ifc_grids', { relPath });
+}

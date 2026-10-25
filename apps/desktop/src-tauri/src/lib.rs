@@ -21,6 +21,7 @@ pub fn run() {
             project::project_open,
             project::project_sample,
             model::project_add_files,
+            model::ifc_grids,
             project::project_close,
             project::project_current,
             model::project_files,
