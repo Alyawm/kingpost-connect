@@ -16,6 +16,7 @@ pub mod diagnostics;
 pub mod drawings;
 pub mod licence;
 pub mod model;
+pub mod notes;
 pub mod project;
 pub mod quantity;
 pub mod review;

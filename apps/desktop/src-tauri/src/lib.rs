@@ -4,8 +4,8 @@
 mod commands;
 
 use commands::{
-    analysis, cache, clash, compare, diagnostics, drawings, licence, model, project, quantity,
-    review, views,
+    analysis, cache, clash, compare, diagnostics, drawings, licence, model, notes, project,
+    quantity, review, views,
 };
 
 pub fn run() {
@@ -33,6 +33,15 @@ pub fn run() {
             views::views_list,
             views::view_save,
             views::view_update,
+            notes::notes_list,
+            notes::note_add,
+            notes::note_update,
+            notes::note_delete,
+            notes::element_links,
+            notes::element_link_add,
+            notes::element_link_delete,
+            notes::link_open,
+            notes::image_save,
             views::view_set_default,
             views::view_rename,
             views::view_delete,
