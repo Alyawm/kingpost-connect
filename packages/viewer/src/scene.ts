@@ -78,6 +78,8 @@ export interface ViewportHandle {
   /** Moves the camera, animated unless `animate` is false. */
   setCamera(state: CameraState, animate?: boolean): void;
   setNavigationMode(mode: NavigationMode): void;
+  /** When on, a left drag draws a selection box (as Shift+drag always does). */
+  setBoxSelect(on: boolean): void;
   /** Called after every frame in which the camera may have moved; returns an unsubscribe. */
   onCameraChange(listener: () => void): () => void;
   /** Renders a frame and returns it as a JPEG data URL no wider than `maxWidth`. */
@@ -167,6 +169,7 @@ export class SceneController implements ViewportHandle {
   onHoverPoint: ((pick: PointPick | null) => void) | null = null;
   private animation = 0;
   private navMode: NavigationMode = 'orbit';
+  private boxSelect = false;
   private look: { x: number; y: number } | null = null;
   private readonly keys = new Set<string>();
   private walkFrame = 0;
@@ -456,6 +459,11 @@ export class SceneController implements ViewportHandle {
     return () => this.cameraListeners.delete(listener);
   }
 
+  setBoxSelect(on: boolean): void {
+    this.boxSelect = on;
+    this.canvas.style.cursor = on ? 'crosshair' : '';
+  }
+
   setNavigationMode(mode: NavigationMode): void {
     this.navMode = mode;
     this.look = null;
@@ -711,7 +719,7 @@ export class SceneController implements ViewportHandle {
     }
 
     // Shift+drag draws a selection box instead of orbiting.
-    if (event.shiftKey && this.pickMode === 'select') {
+    if ((event.shiftKey || this.boxSelect) && this.pickMode === 'select') {
       const host = this.canvas.parentElement ?? document.body;
       const el = document.createElement('div');
       el.style.cssText =
