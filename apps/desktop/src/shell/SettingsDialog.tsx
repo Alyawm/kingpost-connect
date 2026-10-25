@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { X } from 'lucide-react';
 import { Button, IconButton, cn } from '@kingpost/ui';
 import { t } from '../lib/i18n';
+import { LENGTH_UNITS, type LengthUnit, type Units } from '../lib/units';
 import { diagnosticsBundle, geometryCacheClear, isTauri } from '../lib/ipc';
 import { licenceSummary, useLicence } from '../state/licence';
 import { log } from '../state/log';
@@ -20,6 +21,8 @@ export function SettingsDialog() {
   const setAuthor = useUi((s) => s.setAuthor);
   const theme = useUi((s) => s.theme);
   const setTheme = useUi((s) => s.setTheme);
+  const units = useUi((s) => s.units);
+  const setUnits = useUi((s) => s.setUnits);
   const checkAtStartup = useUi((s) => s.checkUpdatesAtStartup);
   const setCheckAtStartup = useUi((s) => s.setCheckUpdatesAtStartup);
   const updates = useUpdates((s) => s.state);
@@ -120,6 +123,65 @@ export function SettingsDialog() {
                 </button>
               ))}
             </div>
+          </section>
+
+          <section className="space-y-1">
+            <div className={label}>Units</div>
+            <div className="grid grid-cols-[auto_1fr] items-center gap-x-2 gap-y-1 text-xs">
+              <span className="text-fg-muted">Length</span>
+              <select
+                className="h-7 rounded border border-edge bg-canvas px-1"
+                value={units.length}
+                onChange={(e) => setUnits({ length: e.target.value as LengthUnit })}
+              >
+                {LENGTH_UNITS.map((u) => (
+                  <option key={u.value} value={u.value}>
+                    {u.label}
+                  </option>
+                ))}
+              </select>
+              <span className="text-fg-muted">Decimals</span>
+              <select
+                className="h-7 rounded border border-edge bg-canvas px-1"
+                value={units.decimals}
+                disabled={units.length === 'auto' || units.length === 'ft-in'}
+                onChange={(e) => setUnits({ decimals: Number(e.target.value) })}
+              >
+                {[0, 1, 2, 3, 4].map((d) => (
+                  <option key={d} value={d}>
+                    {d}
+                  </option>
+                ))}
+              </select>
+              <span className="text-fg-muted">Area</span>
+              <select
+                className="h-7 rounded border border-edge bg-canvas px-1"
+                value={units.area}
+                onChange={(e) => setUnits({ area: e.target.value as Units['area'] })}
+              >
+                <option value="m2">Square metres</option>
+                <option value="ft2">Square feet</option>
+              </select>
+              <span className="text-fg-muted">Volume</span>
+              <select
+                className="h-7 rounded border border-edge bg-canvas px-1"
+                value={units.volume}
+                onChange={(e) => setUnits({ volume: e.target.value as Units['volume'] })}
+              >
+                <option value="m3">Cubic metres</option>
+                <option value="ft3">Cubic feet</option>
+              </select>
+              <span className="text-fg-muted">Angle</span>
+              <select
+                className="h-7 rounded border border-edge bg-canvas px-1"
+                value={units.angle}
+                onChange={(e) => setUnits({ angle: e.target.value as Units['angle'] })}
+              >
+                <option value="deg">Degrees</option>
+                <option value="rad">Radians</option>
+              </select>
+            </div>
+            <p className={hint}>Used for measurements, selection sizes and section positions.</p>
           </section>
 
           <section className="space-y-1">

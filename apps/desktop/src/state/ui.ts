@@ -1,5 +1,6 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
+import { DEFAULT_UNITS, type Units } from '../lib/units';
 
 export type Theme = 'dark' | 'light';
 export type Section =
@@ -36,6 +37,9 @@ interface UiState {
   pinnedProjects: string[];
   /** Display name and last opening of each known project folder. */
   projectMeta: Record<string, { name: string; openedAt: string }>;
+  /** Display units for measurements and sizes. */
+  units: Units;
+  setUnits(patch: Partial<Units>): void;
   /** The Projects page is shown over the workspace. */
   homeOpen: boolean;
   setHomeOpen(open: boolean): void;
@@ -82,6 +86,8 @@ export const useUi = create<UiState>()(
       pinnedProjects: [],
       projectMeta: {},
       homeOpen: false,
+      units: DEFAULT_UNITS,
+      setUnits: (patch) => set({ units: { ...get().units, ...patch } }),
       onboardingDismissed: false,
       setHomeOpen: (homeOpen) => set({ homeOpen }),
       togglePin: (root) => {
@@ -140,6 +146,7 @@ export const useUi = create<UiState>()(
         checkUpdatesAtStartup: s.checkUpdatesAtStartup,
         recentProjects: s.recentProjects,
         pinnedProjects: s.pinnedProjects,
+        units: s.units,
         projectMeta: s.projectMeta,
         onboardingDismissed: s.onboardingDismissed,
       }),

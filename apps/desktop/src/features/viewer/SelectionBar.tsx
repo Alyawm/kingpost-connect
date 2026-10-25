@@ -3,6 +3,8 @@ import { EyeOff, Focus, Ghost, Palette, RotateCcw, ScanSearch, X } from 'lucide-
 import { IconButton, Popover, cn } from '@kingpost/ui';
 import { commonLook, hasLook, useAppearance } from '../../state/appearance';
 import { useModel } from '../../state/model';
+import { useUi } from '../../state/ui';
+import { lengthNumber, lengthSymbol } from '../../lib/units';
 import { useProject } from '../../state/project';
 import { useViewer } from '../../state/viewer';
 import { AppearanceEditor, LookDot } from './AppearanceEditor';
@@ -31,6 +33,7 @@ export function SelectionBar() {
   const ids = useMemo(() => [...selectedIds], [selectedIds]);
   const common = useMemo(() => commonLook(looks, ids), [looks, ids]);
   const model = useModel((s) => s.model);
+  const units = useUi((s) => s.units);
   // Overall size of the selection, so a member or a group can be checked at a glance.
   const size = useMemo(() => {
     const box = ids.length ? model?.boundsOf(ids) : null;
@@ -38,10 +41,10 @@ export function SelectionBar() {
     const x = box.max.x - box.min.x;
     const y = box.max.y - box.min.y;
     const z = box.max.z - box.min.z;
-    const f = (v: number) => (v >= 10 ? v.toFixed(1) : v.toFixed(2));
+    const f = (v: number) => lengthNumber(v, units);
     // Viewer space is y-up: report plan width × plan depth × height.
-    return `${f(x)} × ${f(z)} × ${f(y)} m`;
-  }, [ids, model]);
+    return `${f(x)} × ${f(z)} × ${f(y)} ${lengthSymbol(units)}`.trim();
+  }, [ids, model, units]);
   useEffect(() => {
     if (ids.length > 0) setEverSelected(true);
   }, [ids.length]);

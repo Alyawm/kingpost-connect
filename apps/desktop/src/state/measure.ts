@@ -8,7 +8,6 @@ import {
   createPerpendicularObject,
   createPointObject,
   distanceToPlane,
-  formatDistance,
   measure,
   orthoPoint,
   type PointPick,
@@ -17,6 +16,8 @@ import {
   type ViewportHandle,
 } from '@kingpost/viewer';
 import type { Triple } from '../lib/ipc';
+import { formatAngle, formatLength, lengthNumber, lengthSymbol, type Units } from '../lib/units';
+import { useUi } from './ui';
 import { log } from './log';
 import { useModel } from './model';
 import { useViewer } from './viewer';
@@ -43,16 +44,48 @@ export const SNAP_LABELS: Record<SnapKind, string> = {
   face: 'On face',
 };
 
-/** One finished measurement, enough to list and redraw it. */
+/** One finished measurement, enough to list and redraw it (formatted when shown). */
 export interface MeasureRecord {
   id: string;
   mode: MeasureMode;
-  /** Main value as shown, e.g. "4.250 m" or "90.0°". */
-  text: string;
-  /** Secondary detail, e.g. the X/Y/Z components. */
-  detail: string;
   points: Triple[];
+  /** Metres for lengths, degrees for angles, IFC elevation for points. */
   value: number;
+}
+
+const units = (): Units => useUi.getState().units;
+
+/** The main value as shown, in the current units. */
+export function recordText(record: MeasureRecord, u: Units = units()): string {
+  switch (record.mode) {
+    case 'angle':
+      return formatAngle(record.value, u);
+    case 'point': {
+      const c = ifcPoint(record.points[0]!);
+      return `X ${lengthNumber(c[0], u)}  Y ${lengthNumber(c[1], u)}  Z ${lengthNumber(c[2], u)} ${lengthSymbol(u)}`.trim();
+    }
+    default:
+      return formatLength(record.value, u);
+  }
+}
+
+/** The secondary line: components, the supplement of an angle, or the elevation. */
+export function recordDetail(record: MeasureRecord, u: Units = units()): string {
+  switch (record.mode) {
+    case 'angle':
+      return `${formatAngle(180 - record.value, u)} supplementary`;
+    case 'perpendicular':
+      return 'square to the first face';
+    case 'point':
+      return `elevation ${formatLength(ifcPoint(record.points[0]!)[2], u)}`;
+    default:
+      return components(record.points[0]!, record.points[1]!, u);
+  }
+}
+
+function ifcPoint(t: Triple): Triple {
+  const frame = useModel.getState().frame;
+  return frame ? frame.pointToIfc(v(t)) : t;
 }
 
 interface MeasureState {
@@ -89,31 +122,29 @@ let counter = 0;
 const v = (t: Triple) => new Vector3(t[0], t[1], t[2]);
 const t = (p: { x: number; y: number; z: number }): Triple => [p.x, p.y, p.z];
 
-/** Distances in metres with the components; elevations and coordinates in IFC terms. */
-function components(a: Vector3, b: Vector3): string {
-  const frame = useModel.getState().frame;
-  if (!frame) return '';
-  // IFC is Z-up: report plan X, plan Y and the height difference.
-  const pa = frame.pointToIfc(a);
-  const pb = frame.pointToIfc(b);
-  const d = [pb[0] - pa[0], pb[1] - pa[1], pb[2] - pa[2]].map((x) => x.toFixed(3));
+/** The plan X, plan Y and height components of a distance (IFC is Z-up). */
+function components(a: Triple, b: Triple, u: Units): string {
+  const pa = ifcPoint(a);
+  const pb = ifcPoint(b);
+  const d = [pb[0] - pa[0], pb[1] - pa[1], pb[2] - pa[2]].map((x) => lengthNumber(x, u));
   return `ΔX ${d[0]} · ΔY ${d[1]} · ΔZ ${d[2]}`;
 }
 
 function objectFor(record: MeasureRecord) {
   const p = record.points.map(v);
+  const text = recordText(record);
   switch (record.mode) {
     case 'angle':
-      return createAngleObject(p[0]!, p[1]!, p[2]!, record.value);
+      return createAngleObject(p[0]!, p[1]!, p[2]!, record.value, text);
     case 'perpendicular':
-      return createPerpendicularObject(p[0]!, p[1]!, record.value);
+      return createPerpendicularObject(p[0]!, p[1]!, record.value, text);
     case 'point': {
       const handle = useViewer.getState().handle;
       const size = handle?.contentBounds().getSize(new Vector3()) ?? new Vector3(10, 10, 10);
-      return createPointObject(p[0]!, record.text, Math.max(size.x, size.y, size.z));
+      return createPointObject(p[0]!, text, Math.max(size.x, size.y, size.z));
     }
     default:
-      return createMeasurementObject(measure(p[0]!, p[1]!));
+      return createMeasurementObject(measure(p[0]!, p[1]!), text);
   }
 }
 
@@ -127,7 +158,8 @@ export const useMeasure = create<MeasureState>((set, get) => {
     handle()?.addOverlay(object);
     handle()?.setPreview(null);
     set({ records: [...get().records, full], points: [] });
-    log.info(`Measured ${full.text}${full.detail ? ` (${full.detail})` : ''}`);
+    const detail = recordDetail(full);
+    log.info(`Measured ${recordText(full)}${detail ? ` (${detail})` : ''}`);
   };
 
   /** The second point of a distance, with the ortho constraint when it applies. */
@@ -163,8 +195,6 @@ export const useMeasure = create<MeasureState>((set, get) => {
         const c = frame ? frame.pointToIfc(point) : t(point);
         finish({
           mode,
-          text: `X ${c[0].toFixed(3)}  Y ${c[1].toFixed(3)}  Z ${c[2].toFixed(3)}`,
-          detail: `elevation ${c[2].toFixed(3)} m`,
           points: [t(point)],
           value: c[2],
         });
@@ -179,8 +209,6 @@ export const useMeasure = create<MeasureState>((set, get) => {
         const length = a.distanceTo(b);
         finish({
           mode,
-          text: formatDistance(length),
-          detail: components(a, b),
           points: [t(a), t(b)],
           value: length,
         });
@@ -197,8 +225,6 @@ export const useMeasure = create<MeasureState>((set, get) => {
         const length = a.distanceTo(b);
         finish({
           mode,
-          text: formatDistance(length),
-          detail: components(a, b),
           points: [t(a), t(b)],
           value: length,
         });
@@ -209,8 +235,6 @@ export const useMeasure = create<MeasureState>((set, get) => {
         const degrees = angleAt(a, vertex, b);
         finish({
           mode,
-          text: `${degrees.toFixed(1)}°`,
-          detail: `${(180 - degrees).toFixed(1)}° supplementary`,
           points: [t(a), t(vertex), t(b)],
           value: degrees,
         });
@@ -221,8 +245,6 @@ export const useMeasure = create<MeasureState>((set, get) => {
         const { distance, foot } = distanceToPlane(next[1]!.point, face.point, face.normal!);
         finish({
           mode,
-          text: formatDistance(distance),
-          detail: 'square to the first face',
           points: [t(next[1]!.point), t(foot)],
           value: distance,
         });
@@ -243,17 +265,18 @@ export const useMeasure = create<MeasureState>((set, get) => {
       if (mode === 'distance' && last) {
         const b = constrained(last, pick.point, pick.shift);
         handle()?.setPreview([last, b]);
-        text = formatDistance(last.distanceTo(b));
+        text = formatLength(last.distanceTo(b), units());
       } else if (mode === 'angle' && points.length > 0) {
         const chain = [...points.map((p) => p.point), pick.point];
         handle()?.setPreview(chain);
-        if (chain.length === 3) text = `${angleAt(chain[0]!, chain[1]!, chain[2]!).toFixed(1)}°`;
+        if (chain.length === 3)
+          text = formatAngle(angleAt(chain[0]!, chain[1]!, chain[2]!), units());
       } else if (mode === 'perpendicular' && points.length === 1 && points[0]!.normal) {
         const { distance, foot } = distanceToPlane(pick.point, points[0]!.point, points[0]!.normal);
         handle()?.setPreview([pick.point, foot]);
-        text = formatDistance(distance);
+        text = formatLength(distance, units());
       } else if (mode === 'edge' && pick.edge) {
-        text = formatDistance(pick.edge[0].distanceTo(pick.edge[1]));
+        text = formatLength(pick.edge[0].distanceTo(pick.edge[1]), units());
       } else {
         handle()?.setPreview(null);
       }
@@ -319,5 +342,14 @@ useModel.subscribe((state, previous) => {
   if (state.model !== previous.model) {
     objects.clear();
     useMeasure.setState({ records: [], points: [], hover: null });
+  }
+});
+
+// Changing the units relabels the measurements already on screen.
+useUi.subscribe((state, previous) => {
+  if (state.units !== previous.units && useMeasure.getState().records.length) {
+    const handle = useViewer.getState().handle;
+    for (const object of objects.values()) handle?.removeOverlay(object);
+    useMeasure.getState().redraw();
   }
 });

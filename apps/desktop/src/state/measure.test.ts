@@ -8,7 +8,7 @@ HTMLCanvasElement.prototype.getContext = (() => null) as never;
 vi.mock('@tauri-apps/api/core', () => ({ isTauri: () => false, invoke: vi.fn() }));
 vi.mock('@tauri-apps/api/event', () => ({ listen: vi.fn() }));
 
-const { useMeasure } = await import('./measure');
+const { useMeasure, recordText } = await import('./measure');
 const { useViewer } = await import('./viewer');
 
 const added: unknown[] = [];
@@ -41,7 +41,7 @@ describe('measuring', () => {
     m.pick(at(3, 4, 0));
     const [record] = useMeasure.getState().records;
     expect(record?.value).toBe(5);
-    expect(record?.text).toBe('5.000 m');
+    expect(recordText(record!)).toBe('5.000 m');
     expect(useMeasure.getState().points).toHaveLength(0);
   });
 
@@ -57,7 +57,7 @@ describe('measuring', () => {
     useMeasure.getState().pick(at(1, 0, 0));
     useMeasure.getState().pick(at(0, 0, 0));
     useMeasure.getState().pick(at(0, 0, 1));
-    expect(useMeasure.getState().records[0]?.text).toBe('90.0°');
+    expect(recordText(useMeasure.getState().records[0]!)).toBe('90.0°');
   });
 
   it('measures square to a face and needs a face first', () => {
@@ -80,7 +80,7 @@ describe('measuring', () => {
 
     useMeasure.getState().setMode('point');
     useMeasure.getState().pick(at(1, 2, 3));
-    expect(useMeasure.getState().records[1]?.text).toContain('X 1.000');
+    expect(recordText(useMeasure.getState().records[1]!)).toContain('X 1.000');
   });
 
   it('deletes one measurement or all of them', () => {

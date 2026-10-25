@@ -1,7 +1,14 @@
 import { Axis3d, Trash2, X } from 'lucide-react';
 import { cn } from '@kingpost/ui';
 import type { SnapKind } from '@kingpost/viewer';
-import { MEASURE_MODES, SNAP_LABELS, useMeasure } from '../../state/measure';
+import {
+  MEASURE_MODES,
+  SNAP_LABELS,
+  recordDetail,
+  recordText,
+  useMeasure,
+} from '../../state/measure';
+import { useUi } from '../../state/ui';
 import { useView } from '../../state/view';
 
 const SNAPS: SnapKind[] = ['vertex', 'midpoint', 'edge', 'face'];
@@ -22,6 +29,7 @@ export function MeasurePanel() {
   const points = useMeasure((s) => s.points);
   const remove = useMeasure((s) => s.remove);
   const clear = useMeasure((s) => s.clear);
+  const units = useUi((s) => s.units);
   const active = tool === 'measure';
   if (!active && records.length === 0) return null;
   const current = MEASURE_MODES.find((m) => m.value === mode)!;
@@ -95,8 +103,8 @@ export function MeasurePanel() {
                 className="group flex items-start gap-2 px-2 py-0.5 hover:bg-surface-2"
               >
                 <div className="min-w-0 flex-1">
-                  <div className="font-mono text-fg">{r.text}</div>
-                  {r.detail && <div className="truncate text-[10px] text-fg-muted">{r.detail}</div>}
+                  <div className="font-mono text-fg">{recordText(r, units)}</div>
+                  <div className="truncate text-[10px] text-fg-muted">{recordDetail(r, units)}</div>
                 </div>
                 <span className="shrink-0 text-[10px] text-fg-muted">
                   {MEASURE_MODES.find((m) => m.value === r.mode)?.label}
