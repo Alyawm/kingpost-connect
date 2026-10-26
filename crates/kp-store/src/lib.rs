@@ -6,7 +6,7 @@
 //! in order the next time it is opened. A database written by a newer build is
 //! refused rather than guessed at.
 
-use std::path::Path;
+use std::{path::Path, sync::Arc};
 
 use rusqlite::{Connection, OpenFlags, OptionalExtension, params};
 
@@ -19,6 +19,7 @@ mod migrations;
 mod notes;
 mod quantity;
 mod review;
+mod sync;
 mod views;
 
 pub use analysis::{AnalysisModelRow, AnalysisModelSummary, LinkSetRow};
@@ -33,6 +34,7 @@ pub use quantity::{CatalogueEntry, DensityRow, GeometryQuantity, PresetRow};
 pub use review::{
     CommentRow, IssuePatch, IssueRow, NewIssue, NewViewpoint, STAGES, StatusRow, ViewpointRow,
 };
+pub use sync::{ApplyReport, Change, PendingRow, SYNC_TABLES, SyncCounts, SyncTable};
 pub use views::SavedViewRow;
 
 #[derive(Debug, thiserror::Error)]
@@ -55,6 +57,7 @@ pub struct ProjectRow {
 
 pub struct Store {
     conn: Connection,
+    sync: Arc<sync::SyncRuntime>,
 }
 
 impl Store {
@@ -75,26 +78,32 @@ impl Store {
         conn.execute_batch(
             "PRAGMA journal_mode = WAL;
              PRAGMA synchronous = NORMAL;
-             PRAGMA foreign_keys = ON;",
+             PRAGMA foreign_keys = ON;
+             PRAGMA busy_timeout = 5000;",
         )?;
-        let mut store = Self { conn };
-        store.migrate()?;
-        Ok(store)
+        let mut conn = conn;
+        migrate(&mut conn)?;
+        let sync = sync::setup(&conn)?;
+        Ok(Self { conn, sync })
     }
 
     pub fn schema_version(&self) -> Result<i64> {
-        Ok(self
-            .conn
-            .query_row("PRAGMA user_version", [], |row| row.get(0))?)
+        schema_version(&self.conn)
     }
 
     /// Latest schema version this build knows about.
     pub const fn latest_schema_version() -> i64 {
         migrations::LATEST
     }
+}
 
-    fn migrate(&mut self) -> Result<()> {
-        let current = self.schema_version()?;
+fn schema_version(conn: &Connection) -> Result<i64> {
+    Ok(conn.query_row("PRAGMA user_version", [], |row| row.get(0))?)
+}
+
+fn migrate(conn: &mut Connection) -> Result<()> {
+    {
+        let current = schema_version(conn)?;
         if current > migrations::LATEST {
             return Err(StoreError::SchemaTooNew {
                 found: current,
@@ -102,14 +111,16 @@ impl Store {
             });
         }
         for (version, sql) in migrations::ALL.iter().skip(current as usize) {
-            let tx = self.conn.transaction()?;
+            let tx = conn.transaction()?;
             tx.execute_batch(sql)?;
             tx.pragma_update(None, "user_version", version)?;
             tx.commit()?;
         }
         Ok(())
     }
+}
 
+impl Store {
     /// Records which project this database belongs to. A database holds exactly one.
     pub fn set_project(&self, row: &ProjectRow) -> Result<()> {
         self.conn.execute(
