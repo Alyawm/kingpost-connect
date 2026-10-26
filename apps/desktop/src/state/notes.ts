@@ -151,7 +151,7 @@ export const useNotes = create<NotesState>((set, get) => ({
 
 // Notes belong to the project; pins follow the main model's coordinates.
 useProject.subscribe((state, previous) => {
-  if (state.current?.id !== previous.current?.id) void useNotes.getState().refresh();
+  if (state.current?.root !== previous.current?.root) void useNotes.getState().refresh();
 });
 useModel.subscribe((state, previous) => {
   if (state.model !== previous.model) {

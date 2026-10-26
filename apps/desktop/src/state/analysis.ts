@@ -422,7 +422,7 @@ useModel.subscribe((state, previous) => {
 });
 
 useProject.subscribe((state, previous) => {
-  if (state.current?.id !== previous.current?.id) {
+  if (state.current?.root !== previous.current?.root) {
     useAnalysis.getState().hide();
     useAnalysis.setState({ models: [] });
   }

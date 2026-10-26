@@ -22,6 +22,7 @@ import { useFederation } from './state/federation';
 import { useMeasure } from './state/measure';
 import { useNotes } from './state/notes';
 import { useGrids } from './state/grids';
+import { useSync } from './state/sync';
 import './styles.css';
 
 const container = document.getElementById('root');
@@ -51,6 +52,7 @@ if (import.meta.env.DEV) {
       useMeasure,
       useNotes,
       useGrids,
+      useSync,
     },
   });
 }

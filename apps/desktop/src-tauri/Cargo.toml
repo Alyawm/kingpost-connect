@@ -33,6 +33,7 @@ kp-diff = { path = "../../../crates/kp-diff" }
 kp-analysis = { path = "../../../crates/kp-analysis" }
 kp-licence = { path = "../../../crates/kp-licence" }
 kp-quantity = { path = "../../../crates/kp-quantity" }
+kp-sync = { path = "../../../crates/kp-sync" }
 sha2.workspace = true
 
 [dev-dependencies]

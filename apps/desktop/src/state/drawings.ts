@@ -484,7 +484,7 @@ export const useDrawings = create<DrawingsState>((set, get) => ({
 }));
 
 useProject.subscribe((state, previous) => {
-  if (state.current?.id !== previous.current?.id) {
+  if (state.current?.root !== previous.current?.root) {
     docs.clear();
     useDrawings.setState({
       sheets: [],

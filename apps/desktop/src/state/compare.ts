@@ -135,7 +135,7 @@ export function visibleItems(
 }
 
 useProject.subscribe((state, previous) => {
-  if (state.current?.id !== previous.current?.id) useCompare.getState().clear();
+  if (state.current?.root !== previous.current?.root) useCompare.getState().clear();
 });
 
 // Change colouring reads the current diff: added green, removed red, modified amber.

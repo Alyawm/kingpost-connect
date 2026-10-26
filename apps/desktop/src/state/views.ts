@@ -451,7 +451,7 @@ function parse<T>(json: string): T | null {
 
 // Views belong to the project: reload the list whenever the open project changes.
 useProject.subscribe((state, previous) => {
-  if (state.current?.id !== previous.current?.id) {
+  if (state.current?.root !== previous.current?.root) {
     useViews.setState({ activeId: null });
     void useViews.getState().refresh();
   }

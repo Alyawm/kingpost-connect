@@ -403,7 +403,7 @@ function vector(t: Triple): Vector3 {
 // Review data belongs to the project: reload when it changes, and feed statuses to the
 // colour-by-status legend.
 useProject.subscribe((state, previous) => {
-  if (state.current?.id !== previous.current?.id) void useReview.getState().refresh();
+  if (state.current?.root !== previous.current?.root) void useReview.getState().refresh();
 });
 setStatusSource(() => {
   const map = new Map<string, string>();

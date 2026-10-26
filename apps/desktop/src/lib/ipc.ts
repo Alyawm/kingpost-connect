@@ -1346,3 +1346,89 @@ export function ifcGrids(relPath: string): Promise<GridRow[]> {
   if (!isTauri()) return Promise.resolve([]);
   return invoke<GridRow[]>('ifc_grids', { relPath });
 }
+
+// ---- Sync ----
+
+export interface SyncCounts {
+  device: string;
+  /** Changes made in this copy. */
+  local: number;
+  /** Changes received from other copies. */
+  remote: number;
+  pending: number;
+}
+
+export interface PendingChange {
+  id: string;
+  tbl: string;
+  reason: string;
+  received_at: string;
+}
+
+export interface SyncStatus {
+  folder: string | null;
+  auto: boolean;
+  last_sync: string | null;
+  syncing: boolean;
+  counts: SyncCounts;
+  pending: PendingChange[];
+}
+
+export interface ReceivedFile {
+  rel_path: string;
+  kind: string;
+  from_user: string;
+}
+
+export interface SyncPeer {
+  device: string;
+  user: string;
+  machine: string;
+  last_sync: string;
+}
+
+export interface SyncReport {
+  sent: number;
+  files_sent: number;
+  applied: number;
+  skipped: number;
+  pending: number;
+  received_files: ReceivedFile[];
+  conflicts: string[];
+  peers: SyncPeer[];
+}
+
+export function syncStatus(): Promise<SyncStatus> {
+  return invoke<SyncStatus>('sync_status');
+}
+
+export function syncSetFolder(folder: string | null): Promise<SyncStatus> {
+  return invoke<SyncStatus>('sync_set_folder', { folder });
+}
+
+export function syncSetAuto(on: boolean): Promise<SyncStatus> {
+  return invoke<SyncStatus>('sync_set_auto', { on });
+}
+
+export function syncNow(user: string): Promise<SyncReport> {
+  return invoke<SyncReport>('sync_now', { user });
+}
+
+export function syncRetry(): Promise<number> {
+  return invoke<number>('sync_retry');
+}
+
+export interface SharedProject {
+  id: string;
+  name: string;
+  /** The project's folder inside the shared folder. */
+  path: string;
+}
+
+export function syncSharedProjects(folder: string): Promise<SharedProject[]> {
+  return invoke<SharedProject[]>('sync_shared_projects', { folder });
+}
+
+export function syncJoin(sharedProject: string, target: string): Promise<string> {
+  return invoke<string>('sync_join', { sharedProject, target });
+}

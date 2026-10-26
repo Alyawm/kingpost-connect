@@ -5,7 +5,7 @@ mod commands;
 
 use commands::{
     analysis, cache, clash, compare, diagnostics, drawings, licence, model, notes, project,
-    quantity, review, views,
+    quantity, review, sync, views,
 };
 
 pub fn run() {
@@ -43,6 +43,13 @@ pub fn run() {
             notes::element_link_delete,
             notes::link_open,
             notes::image_save,
+            sync::sync_status,
+            sync::sync_set_folder,
+            sync::sync_set_auto,
+            sync::sync_now,
+            sync::sync_retry,
+            sync::sync_shared_projects,
+            sync::sync_join,
             views::view_set_default,
             views::view_rename,
             views::view_delete,

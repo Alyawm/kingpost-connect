@@ -336,7 +336,7 @@ export const useClash = create<ClashState>((set, get) => ({
 }));
 
 useProject.subscribe((state, previous) => {
-  if (state.current?.id !== previous.current?.id) {
+  if (state.current?.root !== previous.current?.root) {
     abort?.abort();
     useClash.setState({
       tests: [],

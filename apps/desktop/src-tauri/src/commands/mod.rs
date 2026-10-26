@@ -20,6 +20,7 @@ pub mod notes;
 pub mod project;
 pub mod quantity;
 pub mod review;
+pub mod sync;
 pub mod views;
 pub mod watcher;
 

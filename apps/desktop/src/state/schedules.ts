@@ -438,7 +438,7 @@ export const useSchedules = create<SchedulesState>((set, get) => ({
 }));
 
 useProject.subscribe((state, previous) => {
-  if (state.current?.id !== previous.current?.id) {
+  if (state.current?.root !== previous.current?.root) {
     useSchedules.setState({
       builtin: [],
       saved: [],

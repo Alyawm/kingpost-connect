@@ -38,6 +38,7 @@ import type { NavigationMode } from '@kingpost/viewer';
 import { useAppearance } from '../state/appearance';
 import { useHistory } from '../state/history';
 import { useGrids } from '../state/grids';
+import { SyncButton } from './SyncButton';
 import { useMeasure } from '../state/measure';
 import { useModel } from '../state/model';
 import { useProject } from '../state/project';
@@ -122,6 +123,7 @@ export function TitleBar() {
       >
         Commands <Kbd>Ctrl+K</Kbd>
       </button>
+      <SyncButton />
       <IconButton label="Help and shortcuts (F1)" onClick={() => setHelpOpen(true)}>
         <CircleHelp size={18} />
       </IconButton>
