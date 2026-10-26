@@ -1,0 +1,32 @@
+[package]
+name = "kp-server"
+version.workspace = true
+edition.workspace = true
+license-file.workspace = true
+publish.workspace = true
+description = "KingPost Connect sync server: accounts, projects shared by invitation, change relay and file store"
+
+[[bin]]
+name = "kingpost-server"
+path = "src/main.rs"
+
+[dependencies]
+kp-store = { path = "../kp-store" }
+kp-sync = { path = "../kp-sync", default-features = false }
+axum = "0.8"
+tokio = { version = "1", features = ["rt-multi-thread", "macros", "net", "fs", "signal", "io-util"] }
+tokio-util = { version = "0.7", features = ["io"] }
+tower-http = { version = "0.6", features = ["fs"] }
+http-body-util = "0.1"
+argon2 = "0.5"
+getrandom = "0.3"
+rusqlite.workspace = true
+sha2.workspace = true
+base64.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+time.workspace = true
+
+[dev-dependencies]
+kp-sync = { path = "../kp-sync", features = ["client", "testing"] }
+tempfile.workspace = true
