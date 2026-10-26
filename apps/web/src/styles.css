@@ -1,0 +1,22 @@
+@import 'tailwindcss';
+@import '@kingpost/ui/tokens.css';
+
+/* Components in workspace packages use Tailwind classes too; include their sources. */
+@source '../../../packages/ui/src';
+@source '../../../packages/viewer/src';
+
+html,
+body,
+#root {
+  height: 100%;
+  margin: 0;
+  overflow: hidden;
+}
+
+body {
+  background: var(--kp-canvas);
+  color: var(--kp-fg);
+  font-family: var(--font-sans);
+  font-size: 13px;
+  -webkit-font-smoothing: antialiased;
+}
