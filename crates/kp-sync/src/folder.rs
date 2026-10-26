@@ -97,10 +97,6 @@ impl FolderRemote {
         })
     }
 
-    pub fn key(&self) -> &str {
-        &self.key
-    }
-
     /// Sends this copy's new changes and files, then applies what the other copies sent.
     /// Received files are copied into `project_root`; the caller imports them.
     pub fn sync(&self, store: &Store, project_root: &Path, who: &Identity) -> Result<SyncReport> {

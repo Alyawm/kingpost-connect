@@ -16,20 +16,22 @@ use kp_sync::{
     files::{SHARED_KINDS, is_sha256},
     is_safe_relative,
     protocol::{
-        ChangePage, Credentials, DeviceHello, FileNotice, Invitation, Member, NewProject, PeerInfo,
-        ProjectSummary, PushChanges, PushResult, ROLES, Registration, SeqChange, ServerInfo,
-        Session, UserInfo, valid_email, valid_token_text,
+        Credentials, DeviceHello, FileNotice, Invitation, Member, NewProject, PeerInfo,
+        ProjectSummary, PushResult, ROLES, Registration, ServerInfo, Session, UserInfo,
+        valid_email, valid_token_text,
     },
     valid_project_id,
 };
 use rusqlite::{Connection, OptionalExtension, params};
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
+use serde_json::value::RawValue;
 use sha2::{Digest, Sha256};
 use tokio::io::AsyncWriteExt;
 
 use crate::{
     ApiErr, AppState,
     auth::{Authed, create_session, dummy_hash, hash_password, verify_password},
+    hex,
 };
 
 /// Largest file accepted (a big federated model is a few hundred megabytes).
@@ -570,7 +572,7 @@ pub async fn peers(
 
 /// A change as sent: plain ids and names, a known operation, a sensible size. It may come
 /// from another device than the sender's: copies pass on what they received elsewhere.
-fn check_change(change: &Change) -> Result<String, ApiErr> {
+fn check_change(change: &Change) -> Result<(), ApiErr> {
     let plain = |t: &str| {
         !t.is_empty() && t.len() <= 64 && t.chars().all(|c| c.is_ascii_alphanumeric() || c == '_')
     };
@@ -586,18 +588,22 @@ fn check_change(change: &Change) -> Result<String, ApiErr> {
             clean(&change.id, 64)
         )));
     }
-    let body = serde_json::to_string(change).map_err(|_| ApiErr::internal())?;
-    if body.len() > MAX_CHANGE_BYTES {
-        return Err(ApiErr::bad_request("a change is too large"));
-    }
-    Ok(body)
+    Ok(())
+}
+
+/// `PushChanges` with each change left as the text it arrived in, so it is checked once
+/// and stored as sent rather than parsed and written out again.
+#[derive(Deserialize)]
+pub struct RawPush {
+    device: String,
+    changes: Vec<Box<RawValue>>,
 }
 
 pub async fn push_changes(
     State(state): State<AppState>,
     authed: Authed,
     Path(id): Path<String>,
-    Json(push): Json<PushChanges>,
+    Json(push): Json<RawPush>,
 ) -> Result<Json<PushResult>, ApiErr> {
     check_project_id(&id)?;
     if !valid_token_text(&push.device) {
@@ -608,11 +614,17 @@ pub async fn push_changes(
             "send at most {MAX_PUSH} changes at a time"
         )));
     }
-    let bodies: Vec<(String, String)> = push
-        .changes
-        .iter()
-        .map(|c| check_change(c).map(|body| (c.id.clone(), body)))
-        .collect::<Result<_, _>>()?;
+    let mut bodies: Vec<(String, String)> = Vec::with_capacity(push.changes.len());
+    for raw in &push.changes {
+        let text = raw.get();
+        if text.len() > MAX_CHANGE_BYTES {
+            return Err(ApiErr::bad_request("a change is too large"));
+        }
+        let change: Change = serde_json::from_str(text)
+            .map_err(|_| ApiErr::bad_request("a change is not in the expected form"))?;
+        check_change(&change)?;
+        bodies.push((change.id, text.to_owned()));
+    }
     let device = push.device;
     state
         .run(move |conn| {
@@ -644,19 +656,33 @@ pub struct PageQuery {
     limit: Option<usize>,
 }
 
+/// `ChangePage`, with each change passed through as stored instead of parsed and
+/// serialised again.
+#[derive(Serialize)]
+pub struct RawChangePage {
+    changes: Vec<RawSeqChange>,
+    more: bool,
+}
+
+#[derive(Serialize)]
+pub struct RawSeqChange {
+    seq: i64,
+    change: Box<RawValue>,
+}
+
 pub async fn pull_changes(
     State(state): State<AppState>,
     authed: Authed,
     Path(id): Path<String>,
     Query(page): Query<PageQuery>,
-) -> Result<Json<ChangePage>, ApiErr> {
+) -> Result<Json<RawChangePage>, ApiErr> {
     check_project_id(&id)?;
     let after = page.after.unwrap_or(0);
     let limit = page.limit.unwrap_or(1_000).clamp(1, MAX_PUSH);
     state
         .run(move |conn| {
             require(conn, &id, authed.id, "viewer")?;
-            let mut statement = conn.prepare(
+            let mut statement = conn.prepare_cached(
                 "SELECT seq, body FROM project_change WHERE project_id = ?1 AND seq > ?2
                  ORDER BY seq LIMIT ?3",
             )?;
@@ -666,13 +692,13 @@ pub async fn pull_changes(
             let mut changes = Vec::new();
             for row in rows {
                 let (seq, body) = row?;
-                if let Ok(change) = serde_json::from_str::<Change>(&body) {
-                    changes.push(SeqChange { seq, change });
+                if let Ok(change) = RawValue::from_string(body) {
+                    changes.push(RawSeqChange { seq, change });
                 }
             }
             let more = changes.len() > limit;
             changes.truncate(limit);
-            Ok(Json(ChangePage { changes, more }))
+            Ok(Json(RawChangePage { changes, more }))
         })
         .await
 }
@@ -845,13 +871,10 @@ pub async fn put_blob(
     } else {
         let mut random = [0u8; 8];
         getrandom::fill(&mut random).map_err(|_| ApiErr::internal())?;
-        let temp = state.data().join("tmp").join(format!(
-            "{sha}.{}.part",
-            random
-                .iter()
-                .map(|b| format!("{b:02x}"))
-                .collect::<String>()
-        ));
+        let temp = state
+            .data()
+            .join("tmp")
+            .join(format!("{sha}.{}.part", hex(&random)));
         let mut file = tokio::fs::File::create(&temp).await?;
         let mut hasher = Sha256::new();
         let result: Result<(), ApiErr> = async {
@@ -875,11 +898,7 @@ pub async fn put_blob(
         }
         .await;
         drop(file);
-        let digest: String = hasher
-            .finalize()
-            .iter()
-            .map(|b| format!("{b:02x}"))
-            .collect();
+        let digest = hex(&hasher.finalize());
         if let Err(error) = result {
             let _ = tokio::fs::remove_file(&temp).await;
             return Err(error);
@@ -891,7 +910,13 @@ pub async fn put_blob(
         if let Some(parent) = path.parent() {
             tokio::fs::create_dir_all(parent).await?;
         }
-        tokio::fs::rename(&temp, &path).await?;
+        if let Err(error) = tokio::fs::rename(&temp, &path).await {
+            // Two copies uploading the same content at once: the first one's file stands.
+            let _ = tokio::fs::remove_file(&temp).await;
+            if !path.is_file() {
+                return Err(error.into());
+            }
+        }
     }
     state
         .run(move |conn| {

@@ -24,7 +24,7 @@ use std::{
 use axum::{
     Json, Router,
     extract::{DefaultBodyLimit, Request},
-    http::StatusCode,
+    http::{HeaderValue, StatusCode, header},
     middleware::{self, Next},
     response::{Html, IntoResponse, Response},
     routing::{get, post},
@@ -175,8 +175,15 @@ impl From<std::io::Error> for ApiErr {
 pub fn router(state: AppState, web: Option<&Path>) -> Router {
     let api = Router::new()
         .route("/server", get(api::server_info))
-        .route("/auth/register", post(api::register))
-        .route("/auth/login", post(api::login))
+        // Sign-in bodies are tiny; a large one is never legitimate.
+        .route(
+            "/auth/register",
+            post(api::register).layer(DefaultBodyLimit::max(16 << 10)),
+        )
+        .route(
+            "/auth/login",
+            post(api::login).layer(DefaultBodyLimit::max(16 << 10)),
+        )
         .route("/auth/logout", post(api::logout))
         .route("/me", get(api::me))
         .route(
@@ -216,21 +223,45 @@ pub fn router(state: AppState, web: Option<&Path>) -> Router {
             .fallback_service(ServeDir::new(web).fallback(ServeFile::new(web.join("index.html")))),
         None => app.fallback(|| async { Html(LANDING) }),
     };
-    app.layer(middleware::from_fn(log_request))
+    app.layer(middleware::from_fn(wrap_request))
 }
+
+/// What the web viewer's pages may load: only the server itself (the IFC engine runs as
+/// WebAssembly, hence `wasm-unsafe-eval`), nothing framed, no form posts elsewhere.
+const WEB_CSP: &str = "default-src 'self'; img-src 'self' data: blob:; style-src 'self' 'unsafe-inline'; \
+script-src 'self' 'wasm-unsafe-eval'; worker-src 'self' blob:; connect-src 'self'; \
+frame-ancestors 'none'; base-uri 'self'; form-action 'self'; object-src 'none'";
 
 const LANDING: &str = "<!doctype html><meta charset=utf-8><title>KingPost Connect server</title>\
 <body style=\"font-family:system-ui;margin:3rem;color:#1b2129\"><h1>KingPost Connect server</h1>\
 <p>This server is running. In KingPost Connect, open a project, click the cloud button and \
 choose <b>Sync with a server</b>, then enter this address.</p></body>";
 
-async fn log_request(request: Request, next: Next) -> Response {
+/// Logs API requests and adds the browser security headers to every answer.
+async fn wrap_request(request: Request, next: Next) -> Response {
     let started = Instant::now();
     let method = request.method().clone();
     let path = request.uri().path().to_owned();
-    let response = next.run(request).await;
+    let mut response = next.run(request).await;
     let status = response.status();
-    if path.starts_with(API) || status.is_server_error() {
+    let api = path.starts_with(API);
+    let headers = response.headers_mut();
+    headers.insert(
+        header::X_CONTENT_TYPE_OPTIONS,
+        HeaderValue::from_static("nosniff"),
+    );
+    headers.insert(
+        header::REFERRER_POLICY,
+        HeaderValue::from_static("same-origin"),
+    );
+    headers.insert(header::X_FRAME_OPTIONS, HeaderValue::from_static("DENY"));
+    if !api {
+        headers.insert(
+            header::CONTENT_SECURITY_POLICY,
+            HeaderValue::from_static(WEB_CSP),
+        );
+    }
+    if api || status.is_server_error() {
         eprintln!(
             "{} {method} {path} {} {} ms",
             now(),
@@ -245,6 +276,16 @@ pub(crate) fn now() -> String {
     time::OffsetDateTime::now_utc()
         .format(&time::format_description::well_known::Rfc3339)
         .unwrap_or_default()
+}
+
+/// Bytes as lowercase hex.
+pub(crate) fn hex(bytes: &[u8]) -> String {
+    use std::fmt::Write as _;
+    let mut out = String::with_capacity(bytes.len() * 2);
+    for b in bytes {
+        let _ = write!(out, "{b:02x}");
+    }
+    out
 }
 
 /// Serves until `shutdown` completes.

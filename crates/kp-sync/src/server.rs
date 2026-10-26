@@ -345,10 +345,6 @@ impl ServerRemote {
         })
     }
 
-    pub fn key(&self) -> &str {
-        &self.key
-    }
-
     /// Sends this copy's changes and files (unless the user may only view the project),
     /// then applies what the others sent. Received files are written into
     /// `project_root`; the caller imports them.

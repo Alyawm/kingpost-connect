@@ -46,10 +46,7 @@ pub(crate) fn dummy_hash() -> &'static str {
 }
 
 pub(crate) fn token_hash(token: &str) -> String {
-    Sha256::digest(token.as_bytes())
-        .iter()
-        .map(|b| format!("{b:02x}"))
-        .collect()
+    crate::hex(&Sha256::digest(token.as_bytes()))
 }
 
 /// Creates a session for `user_id` and returns its token (shown once, stored hashed).
@@ -84,7 +81,7 @@ impl Throttle {
         }
         let penalty = Duration::from_secs((15u64 << (count - Self::FREE).min(6)).min(900));
         let elapsed = last.elapsed();
-        (elapsed < penalty).then(|| (penalty - elapsed).as_secs().max(1))
+        (elapsed < penalty).then(|| penalty.saturating_sub(elapsed).as_secs().max(1))
     }
 
     pub fn fail(&self, email: &str) {
