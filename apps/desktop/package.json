@@ -1,7 +1,7 @@
 {
   "name": "@kingpost/desktop",
   "private": true,
-  "version": "2.0.0",
+  "version": "2.0.1",
   "type": "module",
   "description": "KingPost Connect desktop application (Tauri shell and React interface).",
   "scripts": {
@@ -43,6 +43,6 @@
     "tailwindcss": "^4.1.11",
     "typescript": "^5.8.3",
     "vite": "^7.0.4",
-    "vitest": "^3.2.4"
+    "vitest": "^4.1.12"
   }
 }

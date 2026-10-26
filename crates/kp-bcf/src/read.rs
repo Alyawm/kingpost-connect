@@ -18,7 +18,11 @@ use crate::{
 
 pub fn read_bcf<R: Read + Seek>(reader: R) -> Result<BcfFile> {
     let mut archive = ZipArchive::new(reader).map_err(|e| BcfError::Zip(e.to_string()))?;
-    let names: Vec<String> = archive.file_names().map(str::to_owned).collect();
+    let names: Vec<String> = archive
+        .file_names()
+        .map(|name| name.map(|n| n.into_owned()))
+        .collect::<std::result::Result<_, _>>()
+        .map_err(|e| BcfError::Zip(e.to_string()))?;
     let mut files: HashMap<String, Vec<u8>> = HashMap::new();
     for name in &names {
         let mut entry = archive

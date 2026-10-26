@@ -277,7 +277,7 @@ pub fn read(text: &str) -> AnalysisModel {
             factors: Vec::new(),
         });
         if let Some(kind) = row.get("ComboType") {
-            entry.kind = kind.clone();
+            entry.kind.clone_from(kind);
         }
         if let (Some(case), Some(factor)) = (
             row.get("CaseName"),

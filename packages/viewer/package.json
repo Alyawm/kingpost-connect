@@ -1,7 +1,7 @@
 {
   "name": "@kingpost/viewer",
   "private": true,
-  "version": "2.0.0",
+  "version": "2.0.1",
   "type": "module",
   "description": "3D viewport for KingPost Connect: three.js scene, picking, and IFC geometry loading.",
   "exports": {
@@ -24,6 +24,6 @@
     "react": "^19.1.0",
     "typescript": "^5.8.3",
     "vite": "^7.0.4",
-    "vitest": "^3.2.4"
+    "vitest": "^4.1.12"
   }
 }

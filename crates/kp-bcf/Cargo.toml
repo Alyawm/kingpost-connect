@@ -7,9 +7,9 @@ publish.workspace = true
 description = "BCF (BIM Collaboration Format) reading and writing: topics, comments, viewpoints, snapshots"
 
 [dependencies]
-quick-xml = "0.37"
+quick-xml = "0.42"
 thiserror.workspace = true
-zip = { version = "2", default-features = false, features = ["deflate"] }
+zip = { version = "9", default-features = false, features = ["deflate"] }
 
 [dev-dependencies]
 tempfile.workspace = true

@@ -163,7 +163,10 @@ fn writes_then_reads_the_same_content() {
 fn archive_layout_follows_the_specification() {
     let bytes = write_bcf(&sample()).unwrap();
     let mut archive = zip::ZipArchive::new(Cursor::new(bytes)).unwrap();
-    let names: Vec<String> = archive.file_names().map(str::to_owned).collect();
+    let names: Vec<String> = archive
+        .file_names()
+        .map(|name| name.unwrap().into_owned())
+        .collect();
     let guid = "3f1b0c3e-5a7d-4c9e-9d2a-1c2b3d4e5f60";
     for expected in [
         "bcf.version",

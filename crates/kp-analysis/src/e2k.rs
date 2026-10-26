@@ -304,7 +304,7 @@ pub fn read(text: &str) -> AnalysisModel {
                         factors: Vec::new(),
                     });
                     if let Some(kind) = kv.get("TYPE") {
-                        entry.kind = kind.clone();
+                        entry.kind.clone_from(kind);
                     }
                     let case = kv.get("LOADCASE").or_else(|| kv.get("LOADCOMBO"));
                     if let (Some(case), Some(factor)) =

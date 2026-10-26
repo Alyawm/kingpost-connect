@@ -18,7 +18,7 @@ use crate::{AnalysisError, Result};
 
 pub fn read_path(path: &Path) -> Result<AnalysisModel> {
     let mut workbook = open_workbook_auto(path).map_err(|e| AnalysisError::Xlsx(e.to_string()))?;
-    let names = workbook.sheet_names().to_vec();
+    let names = workbook.sheet_names().clone();
     let mut sheets = Vec::new();
     for name in names {
         if let Ok(range) = workbook.worksheet_range(&name) {
@@ -29,9 +29,9 @@ pub fn read_path(path: &Path) -> Result<AnalysisModel> {
 }
 
 pub fn read_bytes(bytes: &[u8]) -> Result<AnalysisModel> {
-    let mut workbook = open_workbook_auto_from_rs(Cursor::new(bytes.to_vec()))
+    let mut workbook = open_workbook_auto_from_rs(Cursor::new(bytes))
         .map_err(|e| AnalysisError::Xlsx(e.to_string()))?;
-    let names = workbook.sheet_names().to_vec();
+    let names = workbook.sheet_names().clone();
     let mut sheets = Vec::new();
     for name in names {
         if let Ok(range) = workbook.worksheet_range(&name) {
