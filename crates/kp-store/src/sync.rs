@@ -415,15 +415,27 @@ impl Store {
         Ok(rows.collect::<rusqlite::Result<_>>()?)
     }
 
-    /// Every change known here after `seq` (local and received), for relaying to a server.
-    pub fn changes_after(&self, seq: i64, limit: usize) -> Result<Vec<(i64, Change)>> {
+    /// What to send to the remote `via` after `seq`: changes made here, and changes
+    /// received through other remotes (so a copy that moved from a shared folder to a
+    /// server passes on what it got from the folder). Changes received before remotes were
+    /// recorded are included when `include_unknown` is set.
+    pub fn changes_to_send(
+        &self,
+        seq: i64,
+        via: &str,
+        include_unknown: bool,
+        limit: usize,
+    ) -> Result<Vec<(i64, Change)>> {
         let mut statement = self.conn.prepare(
             "SELECT seq, id, hlc, device, tbl, pk, op, row_json FROM change_log
-             WHERE seq > ?1 ORDER BY seq LIMIT ?2",
+             WHERE seq > ?1
+               AND (origin = 'local' OR (via IS NULL AND ?3) OR (via IS NOT NULL AND via != ?2))
+             ORDER BY seq LIMIT ?4",
         )?;
-        let rows = statement.query_map(params![seq, limit as i64], |row| {
-            Ok((row.get(0)?, row_to_change(row)?))
-        })?;
+        let rows = statement
+            .query_map(params![seq, via, include_unknown, limit as i64], |row| {
+                Ok((row.get(0)?, row_to_change(row)?))
+            })?;
         Ok(rows.collect::<rusqlite::Result<_>>()?)
     }
 
@@ -458,6 +470,15 @@ impl Store {
     /// what this copy knows about its row; what cannot be applied yet is kept and tried
     /// again, here and after later syncs.
     pub fn apply_changes(&self, changes: &[Change]) -> Result<ApplyReport> {
+        self.apply_changes_via(changes, None)
+    }
+
+    /// As [`Store::apply_changes`], remembering the remote the changes came through.
+    pub fn apply_changes_from(&self, changes: &[Change], via: &str) -> Result<ApplyReport> {
+        self.apply_changes_via(changes, Some(via))
+    }
+
+    fn apply_changes_via(&self, changes: &[Change], via: Option<&str>) -> Result<ApplyReport> {
         let mut sorted: Vec<&Change> = changes.iter().collect();
         sorted.sort_by(|a, b| (&a.hlc, &a.id).cmp(&(&b.hlc, &b.id)));
         let tx = self.conn.unchecked_transaction()?;
@@ -465,7 +486,7 @@ impl Store {
         let _reset = Applying(&self.sync.applying);
         let mut report = ApplyReport::default();
         for change in sorted {
-            match self.apply_one(change)? {
+            match self.apply_one(change, via)? {
                 Outcome::Applied => report.applied += 1,
                 Outcome::Skipped => report.skipped += 1,
                 Outcome::Pending => report.pending += 1,
@@ -492,21 +513,25 @@ impl Store {
     fn retry_pending_inner(&self) -> Result<usize> {
         let mut applied = 0;
         loop {
-            let waiting: Vec<Change> = {
-                let mut statement = self.conn.prepare("SELECT change_json FROM sync_pending")?;
-                let rows = statement.query_map([], |r| r.get::<_, String>(0))?;
+            let waiting: Vec<(Change, Option<String>)> = {
+                let mut statement = self
+                    .conn
+                    .prepare("SELECT change_json, via FROM sync_pending")?;
+                let rows = statement.query_map([], |r| {
+                    Ok((r.get::<_, String>(0)?, r.get::<_, Option<String>>(1)?))
+                })?;
                 rows.filter_map(|r| r.ok())
-                    .filter_map(|json| serde_json::from_str(&json).ok())
+                    .filter_map(|(json, via)| Some((serde_json::from_str(&json).ok()?, via)))
                     .collect()
             };
             if waiting.is_empty() {
                 return Ok(applied);
             }
             let mut waiting = waiting;
-            waiting.sort_by(|a, b| (&a.hlc, &a.id).cmp(&(&b.hlc, &b.id)));
+            waiting.sort_by(|(a, _), (b, _)| (&a.hlc, &a.id).cmp(&(&b.hlc, &b.id)));
             let mut progress = 0;
-            for change in &waiting {
-                if !matches!(self.apply_one(change)?, Outcome::Pending) {
+            for (change, via) in &waiting {
+                if !matches!(self.apply_one(change, via.as_deref())?, Outcome::Pending) {
                     progress += 1;
                 }
             }
@@ -517,7 +542,7 @@ impl Store {
         }
     }
 
-    fn apply_one(&self, change: &Change) -> Result<Outcome> {
+    fn apply_one(&self, change: &Change, via: Option<&str>) -> Result<Outcome> {
         let known: bool = self.conn.query_row(
             "SELECT EXISTS (SELECT 1 FROM change_log WHERE id = ?1)",
             [&change.id],
@@ -532,7 +557,7 @@ impl Store {
         let pk_text = change.pk.to_string();
 
         let Some(t) = spec(&change.tbl) else {
-            return self.keep(change, "made by a newer version of KingPost Connect");
+            return self.keep(change, "made by a newer version of KingPost Connect", via);
         };
         let newest: Option<(String, String)> = self
             .conn
@@ -551,7 +576,7 @@ impl Store {
                 Some(values) if values.len() == t.pk.len() => {
                     values.iter().map(json_to_value).collect()
                 }
-                _ => return self.keep(change, "the row key is not valid"),
+                _ => return self.keep(change, "the row key is not valid", via),
             };
             self.conn.execute_batch("SAVEPOINT kp_apply")?;
             let result = match change.op.as_str() {
@@ -564,12 +589,16 @@ impl Store {
                 Ok(Some(reason)) => {
                     self.conn
                         .execute_batch("ROLLBACK TO kp_apply; RELEASE kp_apply")?;
-                    return self.keep(change, &reason);
+                    return self.keep(change, &reason, via);
                 }
                 Err(crate::StoreError::Sqlite(error)) if is_constraint(&error) => {
                     self.conn
                         .execute_batch("ROLLBACK TO kp_apply; RELEASE kp_apply")?;
-                    return self.keep(change, &format!("waiting for related content ({error})"));
+                    return self.keep(
+                        change,
+                        &format!("waiting for related content ({error})"),
+                        via,
+                    );
                 }
                 Err(error) => {
                     self.conn
@@ -580,8 +609,8 @@ impl Store {
         }
 
         self.conn.execute(
-            "INSERT INTO change_log (id, hlc, device, tbl, pk, op, row_json, origin)
-             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, 'remote')",
+            "INSERT INTO change_log (id, hlc, device, tbl, pk, op, row_json, origin, via)
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, 'remote', ?8)",
             params![
                 change.id,
                 change.hlc,
@@ -589,7 +618,8 @@ impl Store {
                 change.tbl,
                 pk_text,
                 change.op,
-                change.row.as_ref().map(|r| r.to_string())
+                change.row.as_ref().map(|r| r.to_string()),
+                via
             ],
         )?;
         self.conn
@@ -601,14 +631,15 @@ impl Store {
         })
     }
 
-    fn keep(&self, change: &Change, reason: &str) -> Result<Outcome> {
+    fn keep(&self, change: &Change, reason: &str, via: Option<&str>) -> Result<Outcome> {
         self.conn.execute(
-            "INSERT INTO sync_pending (id, change_json, reason) VALUES (?1, ?2, ?3)
+            "INSERT INTO sync_pending (id, change_json, reason, via) VALUES (?1, ?2, ?3, ?4)
              ON CONFLICT(id) DO UPDATE SET reason = excluded.reason",
             params![
                 change.id,
                 serde_json::to_string(change).unwrap_or_default(),
-                reason
+                reason,
+                via
             ],
         )?;
         Ok(Outcome::Pending)
@@ -1183,6 +1214,42 @@ mod tests {
         assert_eq!(
             text(&b, "SELECT text FROM note").as_deref(),
             Some("edited after")
+        );
+    }
+
+    #[test]
+    fn changes_from_one_remote_are_passed_on_to_others() {
+        let (a, b) = (store(), store());
+        exec(
+            &a,
+            "INSERT INTO note (id, point_json, text) VALUES ('n1', '[0,0,0]', 'from a');",
+        );
+        b.apply_changes_from(&all(&a), "folder:x").unwrap();
+        exec(
+            &b,
+            "INSERT INTO note (id, point_json, text) VALUES ('n2', '[0,0,0]', 'from b');",
+        );
+        let to = |via: &str, unknown: bool| -> Vec<String> {
+            b.changes_to_send(0, via, unknown, 100)
+                .unwrap()
+                .into_iter()
+                .map(|(_, c)| c.pk[0].as_str().unwrap().to_owned())
+                .collect()
+        };
+        // Back to the folder: only the copy's own. To a server: both.
+        assert_eq!(to("folder:x", false), vec!["n2"]);
+        assert_eq!(to("server:y", false), vec!["n1", "n2"]);
+        // Received before remotes were recorded: sent where asked for.
+        let c = store();
+        c.apply_changes(&all(&a)).unwrap();
+        assert!(
+            c.changes_to_send(0, "folder:x", false, 100)
+                .unwrap()
+                .is_empty()
+        );
+        assert_eq!(
+            c.changes_to_send(0, "server:y", true, 100).unwrap().len(),
+            1
         );
     }
 

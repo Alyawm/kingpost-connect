@@ -222,6 +222,43 @@ mod tests {
     }
 
     #[test]
+    fn a_version_1_9_database_gains_the_sync_route_columns() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("project.db");
+        {
+            // A database as 1.9.0 left it: migrations up to 010 only.
+            let mut conn = Connection::open(&path).unwrap();
+            for (version, sql) in migrations::ALL.iter().take(10) {
+                let tx = conn.transaction().unwrap();
+                tx.execute_batch(sql).unwrap();
+                tx.pragma_update(None, "user_version", version).unwrap();
+                tx.commit().unwrap();
+            }
+            conn.execute(
+                "INSERT INTO change_log (id, hlc, device, tbl, pk, op, origin)
+                 VALUES ('c1', '1', 'd', 'note', '[\"n1\"]', 'upsert', 'remote')",
+                [],
+            )
+            .unwrap();
+        }
+        let store = Store::open(&path).unwrap();
+        assert_eq!(store.schema_version().unwrap(), migrations::LATEST);
+        let via: Option<String> = store
+            .connection()
+            .query_row("SELECT via FROM change_log WHERE id = 'c1'", [], |r| {
+                r.get(0)
+            })
+            .unwrap();
+        assert_eq!(via, None, "changes from before keep an unknown route");
+        store
+            .connection()
+            .query_row("SELECT COUNT(via) FROM sync_pending", [], |r| {
+                r.get::<_, i64>(0)
+            })
+            .unwrap();
+    }
+
+    #[test]
     fn every_table_from_the_plan_exists() {
         let store = Store::open_in_memory().unwrap();
         let mut statement = store
