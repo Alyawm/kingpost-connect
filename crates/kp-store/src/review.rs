@@ -372,13 +372,6 @@ impl Store {
             .flatten())
     }
 
-    pub fn delete_viewpoint(&self, id: &str) -> Result<bool> {
-        Ok(self
-            .conn
-            .execute("DELETE FROM issue_viewpoint WHERE id = ?1", [id])?
-            > 0)
-    }
-
     pub fn statuses(&self) -> Result<Vec<StatusRow>> {
         let mut statement = self
             .conn

@@ -34,7 +34,7 @@ pub use quantity::{CatalogueEntry, DensityRow, GeometryQuantity, PresetRow};
 pub use review::{
     CommentRow, IssuePatch, IssueRow, NewIssue, NewViewpoint, STAGES, StatusRow, ViewpointRow,
 };
-pub use sync::{ApplyReport, Change, PendingRow, SYNC_TABLES, SyncCounts, SyncTable};
+pub use sync::{ApplyReport, Change, PendingRow, SyncCounts};
 pub use views::SavedViewRow;
 
 #[derive(Debug, thiserror::Error)]
@@ -81,6 +81,8 @@ impl Store {
              PRAGMA foreign_keys = ON;
              PRAGMA busy_timeout = 5000;",
         )?;
+        // Sync applies thousands of rows through a handful of statements per table.
+        conn.set_prepared_statement_cache_capacity(128);
         let mut conn = conn;
         migrate(&mut conn)?;
         let sync = sync::setup(&conn)?;

@@ -13,6 +13,8 @@
 //! revision is a local number and stays local.
 
 use std::{
+    collections::HashMap,
+    fmt::Write as _,
     sync::{
         Arc, Mutex,
         atomic::{AtomicBool, Ordering},
@@ -29,7 +31,7 @@ use sha2::{Digest, Sha256};
 use crate::{Result, Store};
 
 /// A table whose rows are shared between copies of a project.
-pub struct SyncTable {
+pub(crate) struct SyncTable {
     pub name: &'static str,
     pub pk: &'static [&'static str],
     /// Columns stored as hex text in the log.
@@ -56,7 +58,7 @@ const fn table(name: &'static str) -> SyncTable {
 }
 
 /// Shared tables, parents before children.
-pub const SYNC_TABLES: &[SyncTable] = &[
+pub(crate) const SYNC_TABLES: &[SyncTable] = &[
     SyncTable {
         blobs: &["thumbnail"],
         ..table("saved_view")
@@ -162,6 +164,8 @@ pub(crate) struct SyncRuntime {
     device: String,
     clock: Mutex<(u64, u32)>,
     applying: AtomicBool,
+    /// Columns of each shared table, read once when the connection opens.
+    columns: HashMap<&'static str, Vec<String>>,
 }
 
 impl SyncRuntime {
@@ -212,10 +216,15 @@ impl Drop for Applying<'_> {
 /// Registers the SQL functions and triggers on a freshly migrated connection.
 pub(crate) fn setup(conn: &Connection) -> Result<Arc<SyncRuntime>> {
     let device = device_id(conn)?;
+    let mut columns = HashMap::new();
+    for t in SYNC_TABLES {
+        columns.insert(t.name, table_columns(conn, t.name)?);
+    }
     let runtime = Arc::new(SyncRuntime {
         device: device.clone(),
         clock: Mutex::new((0, 0)),
         applying: AtomicBool::new(false),
+        columns,
     });
     let clock = runtime.clone();
     conn.create_scalar_function("kp_hlc", 0, FunctionFlags::SQLITE_UTF8, move |_| {
@@ -225,8 +234,17 @@ pub(crate) fn setup(conn: &Connection) -> Result<Arc<SyncRuntime>> {
     conn.create_scalar_function("kp_applying", 0, FunctionFlags::SQLITE_UTF8, move |_| {
         Ok(switch.applying.load(Ordering::SeqCst))
     })?;
-    install_triggers(conn, &device)?;
+    install_triggers(conn, &device, &runtime.columns)?;
     Ok(runtime)
+}
+
+/// Device ids are 32 lowercase hex digits; they are written into trigger SQL, so nothing
+/// else is accepted from a database.
+fn is_device_id(id: &str) -> bool {
+    id.len() == 32
+        && id
+            .bytes()
+            .all(|b| b.is_ascii_digit() || (b'a'..=b'f').contains(&b))
 }
 
 /// A device id belongs to one database file on one machine: a copied project folder, or
@@ -252,6 +270,7 @@ fn device_id(conn: &Connection) -> Result<String> {
     if let Some(fingerprint) = &fingerprint
         && meta("device_fingerprint")?.as_deref() == Some(fingerprint.as_str())
         && let Some(id) = meta("device_id")?
+        && is_device_id(&id)
     {
         return Ok(id);
     }
@@ -267,7 +286,11 @@ fn device_id(conn: &Connection) -> Result<String> {
 }
 
 fn hex(bytes: &[u8]) -> String {
-    bytes.iter().map(|b| format!("{b:02x}")).collect()
+    let mut out = String::with_capacity(bytes.len() * 2);
+    for b in bytes {
+        let _ = write!(out, "{b:02x}");
+    }
+    out
 }
 
 fn unhex(text: &str) -> Option<Vec<u8>> {
@@ -313,13 +336,16 @@ fn pk_json_sql(t: &SyncTable, p: &str) -> String {
     format!("json_array({})", parts.join(", "))
 }
 
-fn install_triggers(conn: &Connection, device: &str) -> Result<()> {
+fn install_triggers(
+    conn: &Connection,
+    device: &str,
+    columns: &HashMap<&'static str, Vec<String>>,
+) -> Result<()> {
     let mut sql = String::new();
     for t in SYNC_TABLES {
-        let columns = table_columns(conn, t.name)?;
-        if columns.is_empty() {
+        let Some(columns) = columns.get(t.name).filter(|c| !c.is_empty()) else {
             continue;
-        }
+        };
         let name = t.name;
         let log = |p: &str, op: &str, row: &str| {
             format!(
@@ -328,7 +354,7 @@ fn install_triggers(conn: &Connection, device: &str) -> Result<()> {
                 pk_json_sql(t, p)
             )
         };
-        let upsert_new = log("NEW", "upsert", &row_json_sql(t, &columns, "NEW"));
+        let upsert_new = log("NEW", "upsert", &row_json_sql(t, columns, "NEW"));
         // An update is shared only when a shared column changed: re-running a clash test
         // that finds the same clashes, or touching a local-only column, records nothing.
         let changed: Vec<String> = columns
@@ -402,17 +428,19 @@ impl Store {
         &self.sync.device
     }
 
-    /// Changes made in this copy after `seq` (exclusive), oldest first, with their sequence
-    /// numbers.
-    pub fn local_changes_after(&self, seq: i64, limit: usize) -> Result<Vec<(i64, Change)>> {
-        let mut statement = self.conn.prepare(
-            "SELECT seq, id, hlc, device, tbl, pk, op, row_json FROM change_log
-             WHERE origin = 'local' AND seq > ?1 ORDER BY seq LIMIT ?2",
-        )?;
-        let rows = statement.query_map(params![seq, limit as i64], |row| {
-            Ok((row.get(0)?, row_to_change(row)?))
-        })?;
-        Ok(rows.collect::<rusqlite::Result<_>>()?)
+    fn columns_of(&self, t: &SyncTable) -> &[String] {
+        self.sync
+            .columns
+            .get(t.name)
+            .map(Vec::as_slice)
+            .unwrap_or(&[])
+    }
+
+    fn forget_pending(&self, id: &str) -> Result<()> {
+        self.conn
+            .prepare_cached("DELETE FROM sync_pending WHERE id = ?1")?
+            .execute([id])?;
+        Ok(())
     }
 
     /// What to send to the remote `via` after `seq`: changes made here, and changes
@@ -445,7 +473,7 @@ impl Store {
         let tx = self.conn.unchecked_transaction()?;
         let mut total = 0;
         for t in SYNC_TABLES {
-            let columns = table_columns(&tx, t.name)?;
+            let columns = self.columns_of(t);
             if columns.is_empty() {
                 continue;
             }
@@ -456,7 +484,7 @@ impl Store {
                      SELECT lower(hex(randomblob(16))), kp_hlc(), ?1, ?2, {pk}, 'upsert', {}
                      FROM main.{} AS x
                      WHERE {pk} NOT IN (SELECT pk FROM change_log WHERE tbl = ?2)",
-                    row_json_sql(t, &columns, "x"),
+                    row_json_sql(t, columns, "x"),
                     t.name
                 ),
                 params![self.sync.device, t.name],
@@ -543,14 +571,12 @@ impl Store {
     }
 
     fn apply_one(&self, change: &Change, via: Option<&str>) -> Result<Outcome> {
-        let known: bool = self.conn.query_row(
-            "SELECT EXISTS (SELECT 1 FROM change_log WHERE id = ?1)",
-            [&change.id],
-            |r| r.get(0),
-        )?;
+        let known: bool = self
+            .conn
+            .prepare_cached("SELECT EXISTS (SELECT 1 FROM change_log WHERE id = ?1)")?
+            .query_row([&change.id], |r| r.get(0))?;
         if known {
-            self.conn
-                .execute("DELETE FROM sync_pending WHERE id = ?1", [&change.id])?;
+            self.forget_pending(&change.id)?;
             return Ok(Outcome::Skipped);
         }
         self.sync.observe(&change.hlc);
@@ -561,12 +587,11 @@ impl Store {
         };
         let newest: Option<(String, String)> = self
             .conn
-            .query_row(
+            .prepare_cached(
                 "SELECT hlc, id FROM change_log WHERE tbl = ?1 AND pk = ?2
                  ORDER BY hlc DESC, id DESC LIMIT 1",
-                params![change.tbl, pk_text],
-                |r| Ok((r.get(0)?, r.get(1)?)),
-            )
+            )?
+            .query_row(params![change.tbl, pk_text], |r| Ok((r.get(0)?, r.get(1)?)))
             .optional()?;
         let stale =
             newest.is_some_and(|(hlc, id)| (hlc, id) >= (change.hlc.clone(), change.id.clone()));
@@ -608,10 +633,12 @@ impl Store {
             }
         }
 
-        self.conn.execute(
-            "INSERT INTO change_log (id, hlc, device, tbl, pk, op, row_json, origin, via)
-             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, 'remote', ?8)",
-            params![
+        self.conn
+            .prepare_cached(
+                "INSERT INTO change_log (id, hlc, device, tbl, pk, op, row_json, origin, via)
+                 VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, 'remote', ?8)",
+            )?
+            .execute(params![
                 change.id,
                 change.hlc,
                 change.device,
@@ -620,10 +647,8 @@ impl Store {
                 change.op,
                 change.row.as_ref().map(|r| r.to_string()),
                 via
-            ],
-        )?;
-        self.conn
-            .execute("DELETE FROM sync_pending WHERE id = ?1", [&change.id])?;
+            ])?;
+        self.forget_pending(&change.id)?;
         Ok(if stale {
             Outcome::Skipped
         } else {
@@ -632,25 +657,29 @@ impl Store {
     }
 
     fn keep(&self, change: &Change, reason: &str, via: Option<&str>) -> Result<Outcome> {
-        self.conn.execute(
-            "INSERT INTO sync_pending (id, change_json, reason, via) VALUES (?1, ?2, ?3, ?4)
-             ON CONFLICT(id) DO UPDATE SET reason = excluded.reason",
-            params![
+        self.conn
+            .prepare_cached(
+                "INSERT INTO sync_pending (id, change_json, reason, via) VALUES (?1, ?2, ?3, ?4)
+                 ON CONFLICT(id) DO UPDATE SET reason = excluded.reason",
+            )?
+            .execute(params![
                 change.id,
                 serde_json::to_string(change).unwrap_or_default(),
                 reason,
                 via
-            ],
-        )?;
+            ])?;
         Ok(Outcome::Pending)
     }
 
     fn apply_delete(&self, t: &SyncTable, pk: &[Value]) -> Result<()> {
         let filter: Vec<String> = t.pk.iter().map(|c| format!("\"{c}\" = ?")).collect();
-        self.conn.execute(
-            &format!("DELETE FROM main.{} WHERE {}", t.name, filter.join(" AND ")),
-            rusqlite::params_from_iter(pk),
-        )?;
+        self.conn
+            .prepare_cached(&format!(
+                "DELETE FROM main.{} WHERE {}",
+                t.name,
+                filter.join(" AND ")
+            ))?
+            .execute(rusqlite::params_from_iter(pk))?;
         Ok(())
     }
 
@@ -659,7 +688,7 @@ impl Store {
         let Some(row) = change.row.as_ref().and_then(|r| r.as_object()) else {
             return Ok(Some("the row is missing".to_owned()));
         };
-        let columns = table_columns(&self.conn, t.name)?;
+        let columns = self.columns_of(t);
         let mut names: Vec<String> = Vec::new();
         let mut values: Vec<Value> = Vec::new();
         for (key, value) in row {
@@ -720,15 +749,14 @@ impl Store {
             format!("DO UPDATE SET {}", set.join(", "))
         };
         let key: Vec<String> = t.pk.iter().map(|c| format!("\"{c}\"")).collect();
-        self.conn.execute(
-            &format!(
+        self.conn
+            .prepare_cached(&format!(
                 "INSERT INTO main.{} ({}) VALUES ({placeholders}) ON CONFLICT ({}) {conflict}",
                 t.name,
                 quoted.join(", "),
                 key.join(", ")
-            ),
-            rusqlite::params_from_iter(&values),
-        )?;
+            ))?
+            .execute(rusqlite::params_from_iter(&values))?;
         Ok(None)
     }
 
@@ -755,15 +783,12 @@ impl Store {
         args.extend(pk.iter().cloned());
         let existing: Option<i64> = self
             .conn
-            .query_row(
-                &format!(
-                    "SELECT rowid FROM main.{} WHERE {}",
-                    t.name,
-                    filter.join(" AND ")
-                ),
-                rusqlite::params_from_iter(&args),
-                |r| r.get(0),
-            )
+            .prepare_cached(&format!(
+                "SELECT rowid FROM main.{} WHERE {}",
+                t.name,
+                filter.join(" AND ")
+            ))?
+            .query_row(rusqlite::params_from_iter(&args), |r| r.get(0))
             .optional()?;
         let Some(rowid) = existing else {
             return Ok(false);
@@ -778,14 +803,13 @@ impl Store {
         }
         if !set.is_empty() {
             args.push(Value::Integer(rowid));
-            self.conn.execute(
-                &format!(
+            self.conn
+                .prepare_cached(&format!(
                     "UPDATE main.{} SET {} WHERE rowid = ?",
                     t.name,
                     set.join(", ")
-                ),
-                rusqlite::params_from_iter(&args),
-            )?;
+                ))?
+                .execute(rusqlite::params_from_iter(&args))?;
         }
         Ok(true)
     }
@@ -815,13 +839,12 @@ impl Store {
         };
         Ok(self
             .conn
-            .query_row(
+            .prepare_cached(
                 "SELECT s.id FROM sheet s JOIN revision r ON r.id = s.revision_id
                  JOIN file f ON f.id = r.file_id
                  WHERE f.rel_path = ?1 AND r.source_sha256 = ?2 AND s.page = ?3",
-                params![path, sha, page],
-                |r| r.get(0),
-            )
+            )?
+            .query_row(params![path, sha, page], |r| r.get(0))
             .optional()?)
     }
 
@@ -932,7 +955,7 @@ mod tests {
 
     fn all(store: &Store) -> Vec<Change> {
         store
-            .local_changes_after(0, 10_000)
+            .changes_to_send(0, "test", false, 10_000)
             .unwrap()
             .into_iter()
             .map(|(_, c)| c)
