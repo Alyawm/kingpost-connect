@@ -428,9 +428,4 @@ useProject.subscribe((state, previous) => {
   }
 });
 
-/** The member the viewer reported, if the pick was an analysis member. */
-export function memberFromPick(pick: { member?: string } | null): string | null {
-  return pick?.member ?? null;
-}
-
 export type { Triple };

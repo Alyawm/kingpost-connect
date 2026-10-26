@@ -592,9 +592,4 @@ export function buildLegend(
     }));
 }
 
-/** Extent of the loaded model along a section axis, for the slider. */
-export function sectionRange(axis: SectionAxis): { min: number; max: number } {
-  return useViewer.getState().handle?.extent(axis) ?? { min: 0, max: 10 };
-}
-
 export { planeOffset };

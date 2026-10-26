@@ -1,8 +1,6 @@
 //! Quantity schedules: built-in and saved definitions, evaluation over a revision,
 //! geometry quantities measured by the interface, material densities, and exports.
 
-use std::path::PathBuf;
-
 use kp_quantity::{Definition, Table, export, presets};
 use kp_store::{CatalogueEntry, DensityRow, GeometryQuantity, PresetRow};
 use serde::Serialize;
@@ -83,7 +81,7 @@ pub fn schedule_export(
     state.with_project(|project| {
         let table =
             kp_quantity::evaluate(project.store(), revision_id, &definition).map_err(describe)?;
-        let target = PathBuf::from(&path);
+        let target = super::checked_output(&path, &["xlsx", "csv"])?;
         let is_xlsx = target
             .extension()
             .is_some_and(|e| e.eq_ignore_ascii_case("xlsx"));

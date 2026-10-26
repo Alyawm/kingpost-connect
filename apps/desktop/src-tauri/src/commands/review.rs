@@ -203,20 +203,6 @@ pub fn issue_update(
 }
 
 #[tauri::command]
-pub fn issue_set_elements(
-    state: State<'_, AppState>,
-    id: String,
-    elements: Vec<String>,
-) -> Result<(), String> {
-    state.with_project(|project| {
-        project
-            .store()
-            .set_issue_elements(&id, &elements)
-            .map_err(describe)
-    })
-}
-
-#[tauri::command]
 pub fn issue_delete(state: State<'_, AppState>, id: String) -> Result<bool, String> {
     state.with_project(|project| project.store().delete_issue(&id).map_err(describe))
 }
@@ -283,11 +269,6 @@ pub fn viewpoint_snapshot(
 }
 
 #[tauri::command]
-pub fn viewpoint_delete(state: State<'_, AppState>, id: String) -> Result<bool, String> {
-    state.with_project(|project| project.store().delete_viewpoint(&id).map_err(describe))
-}
-
-#[tauri::command]
 pub fn status_list(state: State<'_, AppState>) -> Result<Vec<StatusRow>, String> {
     state.with_project(|project| project.store().statuses().map_err(describe))
 }
@@ -331,7 +312,7 @@ fn triple(p: Point) -> [f64; 3] {
 /// Writes every issue of the project to a BCF 3.0 file at `path`.
 #[tauri::command]
 pub fn bcf_export(state: State<'_, AppState>, path: String) -> Result<usize, String> {
-    let target = PathBuf::from(path);
+    let target = super::checked_output(&path, &["bcf", "bcfzip"])?;
     let bytes_and_count = state.with_project(|project| {
         let store = project.store();
         let issues = store.issues().map_err(describe)?;

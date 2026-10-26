@@ -270,8 +270,3 @@ export const useModel = create<ModelState>((set, get) => ({
     return [...selectedIds].map((id) => byId.get(id)?.global_id).filter((g): g is string => !!g);
   },
 }));
-
-/** Express ids of the elements that have geometry, for whole-model operations. */
-export function geometryIds(elements: ElementSummary[]): number[] {
-  return elements.filter((e) => e.has_geometry).map((e) => e.express_id);
-}

@@ -82,3 +82,48 @@ impl AppState {
 fn describe(error: impl std::fmt::Display) -> String {
     error.to_string()
 }
+
+/// A path chosen in a save dialog, checked before anything is written there: a full path
+/// into a folder that exists, with one of the file types the dialog offered. Keeps a
+/// compromised interface from writing arbitrary files anywhere on the disk.
+pub(crate) fn checked_output(path: &str, allowed: &[&str]) -> Result<std::path::PathBuf, String> {
+    let target = std::path::PathBuf::from(path.trim());
+    if !target.is_absolute() {
+        return Err(format!("{path} is not a full path"));
+    }
+    let extension = target
+        .extension()
+        .and_then(|e| e.to_str())
+        .map(str::to_ascii_lowercase)
+        .unwrap_or_default();
+    if !allowed.contains(&extension.as_str()) {
+        return Err(format!(
+            "{path}: the file must be of type {}",
+            allowed.join(", ")
+        ));
+    }
+    if !target.parent().is_some_and(std::path::Path::is_dir) {
+        return Err(format!("{path}: the folder does not exist"));
+    }
+    Ok(target)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::checked_output;
+
+    #[test]
+    fn output_paths_are_full_and_of_the_offered_type() {
+        let dir = std::env::temp_dir();
+        let good = dir.join("export.CSV");
+        assert_eq!(
+            checked_output(good.to_str().unwrap(), &["csv"]).unwrap(),
+            good
+        );
+        let wrong_type = dir.join("export.exe");
+        assert!(checked_output(wrong_type.to_str().unwrap(), &["csv"]).is_err());
+        assert!(checked_output("export.csv", &["csv"]).is_err());
+        let missing = dir.join("no-such-folder-here").join("x.csv");
+        assert!(checked_output(missing.to_str().unwrap(), &["csv"]).is_err());
+    }
+}

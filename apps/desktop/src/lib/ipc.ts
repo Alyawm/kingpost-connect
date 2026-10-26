@@ -166,10 +166,6 @@ export async function readProjectFile(relPath: string): Promise<Uint8Array> {
   return new Uint8Array(buffer);
 }
 
-export function revisionInfo(revisionId: number): Promise<RevisionRow> {
-  return invoke<RevisionRow>('revision_info', { revisionId });
-}
-
 export function revisionElements(revisionId: number): Promise<ElementSummary[]> {
   return invoke<ElementSummary[]>('revision_elements', { revisionId });
 }
@@ -179,14 +175,6 @@ export function elementDetails(
   expressId: number,
 ): Promise<ElementDetails | null> {
   return invoke<ElementDetails | null>('element_details', { revisionId, expressId });
-}
-
-export function searchElements(
-  revisionId: number,
-  query: string,
-  limit = 200,
-): Promise<ElementSummary[]> {
-  return invoke<ElementSummary[]>('search_elements', { revisionId, query, limit });
 }
 
 export interface SavedView {
@@ -404,10 +392,6 @@ export function issueUpdate(
   return invoke<IssueRow | null>('issue_update', { id, patch, author });
 }
 
-export function issueSetElements(id: string, elements: string[]): Promise<void> {
-  return invoke<void>('issue_set_elements', { id, elements });
-}
-
 export function issueDelete(id: string): Promise<boolean> {
   return invoke<boolean>('issue_delete', { id });
 }
@@ -427,10 +411,6 @@ export function viewpointAdd(issueId: string, viewpoint: NewViewpointInput): Pro
 
 export function viewpointSnapshot(id: string): Promise<string | null> {
   return invoke<string | null>('viewpoint_snapshot', { id });
-}
-
-export function viewpointDelete(id: string): Promise<boolean> {
-  return invoke<boolean>('viewpoint_delete', { id });
 }
 
 export function statusList(): Promise<StatusRow[]> {

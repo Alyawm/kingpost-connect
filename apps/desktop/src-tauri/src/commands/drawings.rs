@@ -44,10 +44,7 @@ pub fn drawing_import(
     state.with_project(|project| {
         let path = resolve_in_root(project.root(), &rel_path)?;
         let bytes = fs::read(&path).map_err(|e| format!("{}: {e}", path.display()))?;
-        let sha256: String = Sha256::digest(&bytes)
-            .iter()
-            .map(|b| format!("{b:02x}"))
-            .collect();
+        let sha256 = super::analysis::hex(&Sha256::digest(&bytes));
         let metadata = fs::metadata(&path).ok();
         let size = metadata.as_ref().map(|m| m.len() as i64);
         let mtime = metadata

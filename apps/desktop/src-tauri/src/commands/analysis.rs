@@ -79,8 +79,13 @@ pub fn save_model(store: &Store, revision_id: i64, model: &AnalysisModel) -> Res
         .map_err(describe)
 }
 
-fn hex(bytes: &[u8]) -> String {
-    bytes.iter().map(|b| format!("{b:02x}")).collect()
+pub(crate) fn hex(bytes: &[u8]) -> String {
+    use std::fmt::Write as _;
+    let mut out = String::with_capacity(bytes.len() * 2);
+    for b in bytes {
+        let _ = write!(out, "{b:02x}");
+    }
+    out
 }
 
 fn load_model(store: &Store, revision_id: i64) -> Result<AnalysisModel, String> {

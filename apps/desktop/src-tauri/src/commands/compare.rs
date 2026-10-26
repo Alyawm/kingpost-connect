@@ -1,6 +1,6 @@
 //! Revision comparison: compute or reuse a diff between two revisions, list it, export it.
 
-use std::{fs, path::PathBuf};
+use std::fs;
 
 use kp_diff::{Diff, DiffItem, Summary};
 use serde::Serialize;
@@ -87,7 +87,7 @@ pub fn diff_export_csv(
     to_revision_id: i64,
     path: String,
 ) -> Result<usize, String> {
-    let target = PathBuf::from(path);
+    let target = super::checked_output(&path, &["csv"])?;
     let (csv, count) = state.with_project(|project| {
         let (_, _, _, diff) =
             load_or_compute(project.store(), from_revision_id, to_revision_id, false)?;

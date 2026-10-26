@@ -197,19 +197,6 @@ pub fn read_project_file(state: State<'_, AppState>, rel_path: String) -> Result
 }
 
 #[tauri::command]
-pub fn revision_info(state: State<'_, AppState>, revision_id: i64) -> Result<RevisionRow, String> {
-    state.with_project(|project| {
-        project
-            .store()
-            .revisions(None)
-            .map_err(describe)?
-            .into_iter()
-            .find(|r| r.id == revision_id)
-            .ok_or_else(|| format!("revision {revision_id} does not exist"))
-    })
-}
-
-#[tauri::command]
 pub fn revision_elements(
     state: State<'_, AppState>,
     revision_id: i64,
@@ -235,21 +222,6 @@ pub fn element_details(
             element,
             properties,
         }))
-    })
-}
-
-#[tauri::command]
-pub fn search_elements(
-    state: State<'_, AppState>,
-    revision_id: i64,
-    query: String,
-    limit: Option<usize>,
-) -> Result<Vec<ElementSummary>, String> {
-    state.with_project(|project| {
-        project
-            .store()
-            .search_elements(revision_id, &query, limit.unwrap_or(200))
-            .map_err(describe)
     })
 }
 

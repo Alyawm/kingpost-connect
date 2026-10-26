@@ -9,13 +9,6 @@ export function formatCount(value: number): string {
   return value.toLocaleString();
 }
 
-/** Seconds since the epoch (as the shell reports file times) to a short local string. */
-export function formatEpochSeconds(seconds: string | null): string {
-  if (!seconds) return '';
-  const date = new Date(Number(seconds) * 1000);
-  return Number.isNaN(date.getTime()) ? '' : date.toLocaleString();
-}
-
 export function formatIsoDate(iso: string): string {
   const date = new Date(iso);
   return Number.isNaN(date.getTime()) ? iso : date.toLocaleString();

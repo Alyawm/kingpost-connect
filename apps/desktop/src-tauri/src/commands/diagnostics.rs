@@ -77,7 +77,7 @@ pub fn diagnostics_bundle(
     path: String,
 ) -> Result<BundleSummary, String> {
     state.with_project(|project| {
-        let target = PathBuf::from(&path);
+        let target = super::checked_output(&path, &["zip"])?;
         let file = fs::File::create(&target).map_err(|e| format!("{}: {e}", target.display()))?;
         let mut zip = ZipWriter::new(file);
         let options = SimpleFileOptions::default().compression_method(zip::CompressionMethod::Deflated);

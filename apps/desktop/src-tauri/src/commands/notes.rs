@@ -147,11 +147,36 @@ pub fn link_open(state: State<'_, AppState>, kind: String, target: String) -> Re
             if !full.exists() {
                 return Err(format!("{} does not exist", full.display()));
             }
+            refuse_programs(&full)?;
             Ok(full.display().to_string())
         }
         _ => Err(format!("unknown link kind {kind}")),
     })?;
     open_with_system(&resolved)
+}
+
+/// File types that run code when "opened". A link may point at one (it is just a path),
+/// but the application never launches it: links come from colleagues through sync, and a
+/// click should never execute a program.
+const NOT_OPENED: &[&str] = &[
+    "exe", "com", "bat", "cmd", "msi", "msp", "scr", "pif", "cpl", "dll", "sys", "ps1", "psm1",
+    "vbs", "vbe", "js", "jse", "wsf", "wsh", "hta", "jar", "lnk", "url", "reg", "inf", "scf", "sh",
+    "command", "app", "desktop", "appimage", "run",
+];
+
+fn refuse_programs(path: &Path) -> Result<(), String> {
+    let extension = path
+        .extension()
+        .and_then(|e| e.to_str())
+        .map(str::to_ascii_lowercase)
+        .unwrap_or_default();
+    if NOT_OPENED.contains(&extension.as_str()) {
+        return Err(format!(
+            "{} is a program or script; the application does not open those. Find it in its folder instead.",
+            path.display()
+        ));
+    }
+    Ok(())
 }
 
 #[cfg(windows)]
@@ -184,7 +209,8 @@ pub fn image_save(path: String, data: String) -> Result<usize, String> {
     let bytes = STANDARD
         .decode(payload.trim())
         .map_err(|e| format!("image is not valid base64: {e}"))?;
-    std::fs::write(&path, &bytes).map_err(|e| format!("{path}: {e}"))?;
+    let target = super::checked_output(&path, &["png", "jpg", "jpeg"])?;
+    std::fs::write(&target, &bytes).map_err(|e| format!("{}: {e}", target.display()))?;
     Ok(bytes.len())
 }
 
@@ -205,5 +231,16 @@ mod tests {
         );
         assert!(normalise_target(&root, "file", "../outside.pdf").is_err());
         assert!(normalise_target(&root, "zip", "x").is_err());
+    }
+
+    #[test]
+    fn programs_and_scripts_are_never_launched() {
+        assert!(refuse_programs(Path::new("C:/Windows/System32/calc.exe")).is_err());
+        assert!(refuse_programs(Path::new("tools/Setup.MSI")).is_err());
+        assert!(refuse_programs(Path::new("notes/run.ps1")).is_err());
+        assert!(refuse_programs(Path::new("link.lnk")).is_err());
+        assert!(refuse_programs(Path::new("drawings/GA.pdf")).is_ok());
+        assert!(refuse_programs(Path::new("models/frame.ifc")).is_ok());
+        assert!(refuse_programs(Path::new("reports")).is_ok());
     }
 }
