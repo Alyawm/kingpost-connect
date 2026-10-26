@@ -144,3 +144,8 @@ person out everywhere.
   files only inside its project folder.
 - On each computer, KingPost Connect keeps the sign-in token in the user's application
   settings folder (`sync-accounts.json`), never in the project.
+- Every answer carries `X-Content-Type-Options: nosniff`, `Referrer-Policy: same-origin`
+  and `X-Frame-Options: DENY`; the web viewer's pages carry a `Content-Security-Policy`
+  that allows only the server itself. A reverse proxy should pass these through
+  unchanged.
+- Sign-in bodies are limited to 16 KB, change pushes to 64 MB, file uploads to 8 GB.

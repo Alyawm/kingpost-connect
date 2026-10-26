@@ -3,6 +3,29 @@
 All notable changes to KingPost Connect. The format follows Keep a Changelog; versions
 follow semantic versioning. Milestone tags match the headings below.
 
+## [2.0.1] — 2026-10-26 — Review: security, tidying and speed
+
+### Security
+- Links to programs and scripts (`.exe`, `.bat`, `.ps1`, `.lnk` and the like) are no
+  longer opened; documents and folders open as before. Links travel between copies, so a
+  click must never run anything.
+- Exports (image, CSV, BCF, schedule, diagnostics bundle) are written only to a full path
+  in an existing folder with one of the file types the save dialog offered.
+- The server adds `Content-Security-Policy` for the web viewer and `nosniff`,
+  `Referrer-Policy` and `X-Frame-Options` to every answer; sign-in requests are capped at
+  16 KB.
+- Dependencies with advisories updated: `zip` 9, `quick-xml` 0.42, `vitest` 4.
+
+### Changed
+- Received changes are applied faster: table columns are read once per connection and
+  the statements are cached.
+- The server relays change records as stored instead of parsing and serialising them
+  again on every push and pull.
+
+### Removed
+- Four commands the interface never used (`revision_info`, `search_elements`,
+  `issue_set_elements`, `viewpoint_delete`) and other unused code.
+
 ## [2.0.0] — 2026-10-26 — Sync server and web viewer
 
 ### Added
