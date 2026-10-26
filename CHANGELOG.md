@@ -3,6 +3,24 @@
 All notable changes to KingPost Connect. The format follows Keep a Changelog; versions
 follow semantic versioning. Milestone tags match the headings below.
 
+## [1.9.0] — 2026-10-26 — Sync through a shared folder
+
+### Added
+- Sync between copies of a project through a shared folder (OneDrive, SharePoint,
+  Dropbox, Google Drive or a network share): issues, comments, viewpoints, element
+  statuses, views, notes, links, drawing links and markups, clash tests and reviews,
+  presets and densities, and the model, drawing and analysis files.
+- Sync panel from the title bar: shared folder, sync now, automatic sync on opening and
+  every two minutes, other copies with user, computer and last sync, waiting items with
+  the reason.
+- Join shared project on the Projects page: creates your copy from the shared folder.
+- Every change to shared content is recorded in the project (migration 010); the newest
+  edit wins per item, and a model changed on both sides is kept twice instead of
+  overwritten.
+
+### Changed
+- Panels reload when a different project folder opens, not only a different project id.
+
 ## [1.8.0] — 2026-10-25 — Filled sections and grids
 
 ### Added

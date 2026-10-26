@@ -243,6 +243,13 @@ Durations assume **2 developers** (one Rust/backend‑leaning, one React/3D‑le
 - If the client excludes it: `kp-quantity` and `packages/schedules` are simply never created; nothing else depends on them.
 
 ### Phase 9 — Cloud & sync (post‑v1)
+
+> Status 2026‑10‑26: change‑log sync done and tagged `v1.9.0`: every change to shared
+> content is recorded per row with a hybrid logical clock, copies exchange changes and
+> files through a shared folder (OneDrive, Dropbox, Google Drive, network share), newest
+> edit wins per row, files changed on both sides are kept twice, and a project can be
+> joined from the shared folder. Open: sync server with accounts and sharing by
+> invitation, web viewer. See `docs/devlog/2026-10-phase9-sync.md` and ADR 014.
 - Account service, project sharing, change‑log based sync, web viewer reusing the same React/three.js code.
 
 ## 6. Risks and how we handle them

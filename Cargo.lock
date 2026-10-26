@@ -1977,7 +1977,7 @@ dependencies = [
 
 [[package]]
 name = "kingpost-connect"
-version = "1.8.0"
+version = "1.9.0"
 dependencies = [
  "base64 0.22.1",
  "kp-analysis",
@@ -1988,6 +1988,7 @@ dependencies = [
  "kp-project",
  "kp-quantity",
  "kp-store",
+ "kp-sync",
  "notify",
  "serde",
  "serde_json",
@@ -2005,7 +2006,7 @@ dependencies = [
 
 [[package]]
 name = "kp-analysis"
-version = "1.8.0"
+version = "1.9.0"
 dependencies = [
  "calamine",
  "kp-ifc",
@@ -2017,7 +2018,7 @@ dependencies = [
 
 [[package]]
 name = "kp-bcf"
-version = "1.8.0"
+version = "1.9.0"
 dependencies = [
  "quick-xml 0.37.5",
  "tempfile",
@@ -2027,7 +2028,7 @@ dependencies = [
 
 [[package]]
 name = "kp-diff"
-version = "1.8.0"
+version = "1.9.0"
 dependencies = [
  "kp-store",
  "serde",
@@ -2037,7 +2038,7 @@ dependencies = [
 
 [[package]]
 name = "kp-ifc"
-version = "1.8.0"
+version = "1.9.0"
 dependencies = [
  "kp-store",
  "serde",
@@ -2049,7 +2050,7 @@ dependencies = [
 
 [[package]]
 name = "kp-licence"
-version = "1.8.0"
+version = "1.9.0"
 dependencies = [
  "base64 0.22.1",
  "ed25519-dalek",
@@ -2062,7 +2063,7 @@ dependencies = [
 
 [[package]]
 name = "kp-project"
-version = "1.8.0"
+version = "1.9.0"
 dependencies = [
  "kp-store",
  "serde",
@@ -2075,7 +2076,7 @@ dependencies = [
 
 [[package]]
 name = "kp-quantity"
-version = "1.8.0"
+version = "1.9.0"
 dependencies = [
  "kp-store",
  "rust_xlsxwriter",
@@ -2086,13 +2087,28 @@ dependencies = [
 
 [[package]]
 name = "kp-store"
-version = "1.8.0"
+version = "1.9.0"
 dependencies = [
  "rusqlite",
  "serde",
  "serde_json",
+ "sha2",
  "tempfile",
  "thiserror 2.0.21",
+]
+
+[[package]]
+name = "kp-sync"
+version = "1.9.0"
+dependencies = [
+ "kp-store",
+ "rusqlite",
+ "serde",
+ "serde_json",
+ "sha2",
+ "tempfile",
+ "thiserror 2.0.21",
+ "time",
 ]
 
 [[package]]

@@ -3,8 +3,9 @@
 KingPost Connect is a desktop application for structural engineers: open IFC models,
 review them element by element, compare revisions, overlay analysis models, link PDF
 drawings to the model and run clash checks. Everything stays in a project folder on your
-computer; the application makes no network connection unless you ask it to check for an
-update.
+computer. To work with colleagues, copies of a project sync through a shared folder you
+choose (see "Working together"); the application itself makes no network connection
+unless you ask it to check for an update.
 
 ## Projects
 
@@ -221,6 +222,40 @@ example `[Mass] / [Length]` for mass per metre or `C / D * 1000`; it understands
 handle to reorder them (letters in formulas follow their columns); double-click a column
 name to rename it. Lengths, areas and volumes from the model's quantities are converted
 using the units the IFC file declares (millimetres, feet and so on).
+
+## Working together
+
+Everyone works in their own copy of the project; the copies keep each other up to date
+through a folder all of you can reach: a OneDrive, SharePoint, Dropbox or Google Drive
+folder, or a network share.
+
+**Start sharing.** Open the project, click the cloud button in the title bar and
+**Choose shared folder…**. The first sync sends the project's issues, comments,
+viewpoints, element statuses, views, notes, links, drawing links and markups, clash tests
+and their reviews, presets and densities, and publishes the model, drawing and analysis
+files.
+
+**Join.** On the Projects page, **Join shared project…**: pick the same shared folder,
+then an empty folder for your copy. The first sync brings everything and imports the
+files.
+
+**Day to day.** With "Sync automatically" on, a project syncs when it opens and every two
+minutes; **Sync now** does it at once. Import a new revision of a model as usual; it goes
+to the others with the next sync and they import it automatically. The Sync panel lists
+the other copies with their user, computer and last sync.
+
+**When two people change the same thing.** Each issue, comment, note, markup and status is
+kept separately, so additions never collide. If two people edit the same item, the later
+edit wins. If a model file changed on both sides and the local change was not imported,
+nothing is overwritten: the other version is saved beside yours, for example
+`frame (from Sam).ifc`, and the log says so.
+
+**Waiting.** Something that cannot be placed yet waits and is shown in the Sync panel with
+the reason, for example a markup on a drawing revision you never had. It is applied as
+soon as possible.
+
+**Stop syncing** keeps everything in your copy as it is. Each copy writes only its own
+files into the shared folder; do not edit or remove them by hand.
 
 ## Settings and help
 

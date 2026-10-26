@@ -22,6 +22,7 @@ Read them in order to understand why the code looks the way it does.
 | [011](011-element-appearance.md) | Appearance overrides painted in the merged meshes; see-through elements in companion meshes; views by GlobalId | Accepted |
 | [012](012-section-planes.md) | Section planes as point and normal toward the removed side; handles drawn in a second pass | Accepted |
 | [013](013-reference-models.md) | One main model with full features; reference models aligned by their IFC frames | Accepted |
+| [014](014-sync-change-log.md) | Sync by a per-row change log recorded with triggers; shared folders as the first transport | Accepted |
 
 ## Template
 
