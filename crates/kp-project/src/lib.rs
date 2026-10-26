@@ -59,6 +59,12 @@ pub struct Project {
 impl Project {
     /// Creates a project in an existing, non-project directory.
     pub fn create(root: &Path, name: &str) -> Result<Self> {
+        Self::create_with_id(root, name, &uuid::Uuid::new_v4().to_string())
+    }
+
+    /// Creates a local copy of a project known elsewhere (joined from a shared folder):
+    /// same id, so the copies recognise each other when they sync.
+    pub fn create_with_id(root: &Path, name: &str, id: &str) -> Result<Self> {
         let name = name.trim();
         if name.is_empty() {
             return Err(ProjectError::EmptyName);
@@ -75,7 +81,7 @@ impl Project {
 
         let manifest = Manifest {
             manifest_version: MANIFEST_VERSION,
-            id: uuid::Uuid::new_v4().to_string(),
+            id: id.to_owned(),
             name: name.to_owned(),
             created_at: now_rfc3339(),
         };
