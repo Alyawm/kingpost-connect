@@ -12,3 +12,11 @@ export function shortPath(path: string, max = 40, keep = 2): string {
   const root = (unc ? sep + sep : path.startsWith(sep) ? sep : '') + parts[0];
   return [root, '…', ...parts.slice(-keep)].join(sep);
 }
+
+/** Plain http to anything but this computer travels unencrypted. */
+export function unencrypted(url: string): boolean {
+  const lower = url.trim().toLowerCase();
+  if (!lower.startsWith('http://')) return false;
+  const host = lower.slice(7).split(/[/:]/)[0] ?? '';
+  return !(host === 'localhost' || host === '127.0.0.1' || host === '[::1]');
+}

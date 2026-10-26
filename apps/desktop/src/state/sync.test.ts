@@ -16,7 +16,7 @@ vi.mock('@tauri-apps/api/event', () => ({ listen: vi.fn() }));
 
 const { describeSync } = await import('./sync');
 const { ago } = await import('../lib/time');
-const { shortPath } = await import('../lib/path');
+const { shortPath, unencrypted } = await import('../lib/path');
 
 function report(partial: Partial<SyncReport> = {}): SyncReport {
   return {
@@ -28,6 +28,7 @@ function report(partial: Partial<SyncReport> = {}): SyncReport {
     received_files: [],
     conflicts: [],
     peers: [],
+    role: null,
     ...partial,
   };
 }
@@ -86,5 +87,16 @@ describe('shortPath', () => {
     expect(shortPath('/home/ann/Dropbox/Clients/Harbour/Structural/sync')).toBe(
       '/home/…/Structural/sync',
     );
+  });
+});
+
+describe('unencrypted', () => {
+  it('warns about plain http to other computers only', () => {
+    expect(unencrypted('https://sync.firm.com')).toBe(false);
+    expect(unencrypted('sync.firm.com')).toBe(false);
+    expect(unencrypted('http://10.0.0.5:8640')).toBe(true);
+    expect(unencrypted('HTTP://server/kp')).toBe(true);
+    expect(unencrypted('http://localhost:8640')).toBe(false);
+    expect(unencrypted('http://127.0.0.1')).toBe(false);
   });
 });

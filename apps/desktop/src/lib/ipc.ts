@@ -1366,7 +1366,14 @@ export interface PendingChange {
 }
 
 export interface SyncStatus {
+  /** The shared folder, when the project syncs through one. */
   folder: string | null;
+  /** The server address, when the project syncs through one. */
+  server: string | null;
+  /** Who is signed in to that server, if anyone. */
+  account: ServerAccount | null;
+  /** The user's role in the project on that server, as of the last sync. */
+  role: ProjectRole | null;
   auto: boolean;
   last_sync: string | null;
   syncing: boolean;
@@ -1396,14 +1403,23 @@ export interface SyncReport {
   received_files: ReceivedFile[];
   conflicts: string[];
   peers: SyncPeer[];
+  role: ProjectRole | null;
 }
 
 export function syncStatus(): Promise<SyncStatus> {
   return invoke<SyncStatus>('sync_status');
 }
 
-export function syncSetFolder(folder: string | null): Promise<SyncStatus> {
+export function syncSetFolder(folder: string): Promise<SyncStatus> {
   return invoke<SyncStatus>('sync_set_folder', { folder });
+}
+
+export function syncUseServer(url: string): Promise<SyncStatus> {
+  return invoke<SyncStatus>('sync_use_server', { url });
+}
+
+export function syncStop(): Promise<SyncStatus> {
+  return invoke<SyncStatus>('sync_stop');
 }
 
 export function syncSetAuto(on: boolean): Promise<SyncStatus> {
@@ -1431,4 +1447,88 @@ export function syncSharedProjects(folder: string): Promise<SharedProject[]> {
 
 export function syncJoin(sharedProject: string, target: string): Promise<string> {
   return invoke<string>('sync_join', { sharedProject, target });
+}
+
+export type ProjectRole = 'owner' | 'editor' | 'viewer';
+
+export interface ServerAccount {
+  url: string;
+  email: string;
+  name: string;
+}
+
+export interface ServerInfo {
+  name: string;
+  version: string;
+  open_signup: boolean;
+  first_user: boolean;
+}
+
+export interface ServerProject {
+  id: string;
+  name: string;
+  role: ProjectRole;
+  created_at: string;
+}
+
+export interface ProjectMember {
+  email: string;
+  name: string;
+  role: ProjectRole;
+  pending: boolean;
+}
+
+export function syncServerInfo(url: string): Promise<ServerInfo> {
+  return invoke<ServerInfo>('sync_server_info', { url });
+}
+
+export function syncServerLogin(
+  url: string,
+  email: string,
+  password: string,
+): Promise<ServerAccount> {
+  return invoke<ServerAccount>('sync_server_login', { url, email, password });
+}
+
+export function syncServerRegister(
+  url: string,
+  email: string,
+  name: string,
+  password: string,
+): Promise<ServerAccount> {
+  return invoke<ServerAccount>('sync_server_register', { url, email, name, password });
+}
+
+export function syncServerLogout(url: string): Promise<void> {
+  return invoke<void>('sync_server_logout', { url });
+}
+
+export function syncServerAccounts(): Promise<ServerAccount[]> {
+  if (!isTauri()) return Promise.resolve([]);
+  return invoke<ServerAccount[]>('sync_server_accounts');
+}
+
+export function syncServerProjects(url: string): Promise<ServerProject[]> {
+  return invoke<ServerProject[]>('sync_server_projects', { url });
+}
+
+export function syncJoinServer(
+  url: string,
+  projectId: string,
+  name: string,
+  target: string,
+): Promise<string> {
+  return invoke<string>('sync_join_server', { url, projectId, name, target });
+}
+
+export function syncMembers(): Promise<ProjectMember[]> {
+  return invoke<ProjectMember[]>('sync_members');
+}
+
+export function syncInvite(email: string, role: ProjectRole): Promise<ProjectMember> {
+  return invoke<ProjectMember>('sync_invite', { email, role });
+}
+
+export function syncRemoveMember(email: string): Promise<void> {
+  return invoke<void>('sync_remove_member', { email });
 }

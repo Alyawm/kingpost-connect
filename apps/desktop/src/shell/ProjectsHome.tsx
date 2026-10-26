@@ -4,7 +4,7 @@ import { Button, cn } from '@kingpost/ui';
 import { isTauri, projectIsProject } from '../lib/ipc';
 import { useProject } from '../state/project';
 import { useUi } from '../state/ui';
-import { useSync } from '../state/sync';
+import { JoinShared } from './JoinShared';
 
 /** "3 hours ago", "yesterday", or a date. */
 function ago(iso: string | undefined): string {
@@ -37,10 +37,7 @@ export function ProjectsHome() {
   const openFolder = useProject((s) => s.openFolder);
   const openPath = useProject((s) => s.openPath);
   const openSample = useProject((s) => s.openSample);
-  const startJoin = useSync((s) => s.startJoin);
-  const join = useSync((s) => s.join);
-  const joinChoices = useSync((s) => s.joinChoices);
-  const cancelJoin = useSync((s) => s.cancelJoin);
+  const [joining, setJoining] = useState(false);
   const [query, setQuery] = useState('');
   const [missing, setMissing] = useState<Set<string>>(new Set());
 
@@ -146,9 +143,9 @@ export function ProjectsHome() {
             <FolderPlus size={16} /> New project…
           </Button>
           <Button
-            onClick={() => void startJoin()}
+            onClick={() => setJoining(!joining)}
             disabled={busy}
-            title="Get your own copy of a project a colleague shares through OneDrive, Dropbox or a network folder"
+            title="Get your own copy of a project a colleague shares through a shared folder or a server"
           >
             <FolderSync size={16} /> Join shared project…
           </Button>
@@ -166,29 +163,7 @@ export function ProjectsHome() {
           </label>
         </div>
 
-        {joinChoices && (
-          <section className="mb-6 rounded-md border border-edge bg-surface p-3">
-            <div className="mb-2 flex items-center justify-between">
-              <h2 className="text-sm font-medium">Which project do you want to join?</h2>
-              <button
-                type="button"
-                className="text-fg-muted hover:text-fg"
-                onClick={cancelJoin}
-                aria-label="Cancel"
-              >
-                <X size={16} />
-              </button>
-            </div>
-            <ul className="space-y-1">
-              {joinChoices.map((p) => (
-                <li key={p.id} className="flex items-center justify-between gap-2 text-sm">
-                  <span className="truncate">{p.name}</span>
-                  <Button onClick={() => void join(p)}>Join</Button>
-                </li>
-              ))}
-            </ul>
-          </section>
-        )}
+        {joining && <JoinShared onClose={() => setJoining(false)} />}
 
         {pinnedList.length > 0 && (
           <section className="mb-8">
