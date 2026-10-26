@@ -18,20 +18,18 @@
 
 use std::{
     fs,
-    io::Read,
     path::{Path, PathBuf},
 };
 
 use kp_store::{Change, Store};
 use serde::{Deserialize, Serialize};
-use sha2::{Digest, Sha256};
 
 use crate::{
-    Peer, ReceivedFile, Result, SyncError, SyncReport, hex, io_error, now_rfc3339, safe_relative,
+    Identity, Peer, Result, SyncError, SyncReport,
+    files::{self, BlobSource, FileNotice, copy_atomic, hash_file, is_sha256, write_atomic},
+    io_error, now_rfc3339, valid_project_id,
 };
 
-/// File kinds that travel with the project.
-const SHARED_KINDS: &[&str] = &["ifc", "pdf", "saf", "e2k", "s2k"];
 const BATCH: usize = 2_000;
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -48,30 +46,24 @@ struct DeviceInfo {
     last_sync: String,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
-struct FileNotice {
-    rel_path: String,
-    sha256: String,
-    kind: String,
-    size: u64,
-    user: String,
-    published_at: String,
-    /// When that version was imported where it came from.
-    #[serde(default)]
-    imported_at: Option<String>,
-}
-
-/// Who is syncing, shown to the other copies.
-#[derive(Debug, Clone)]
-pub struct Identity {
-    pub user: String,
-    pub machine: String,
-}
-
 pub struct FolderRemote {
     root: PathBuf,
     /// Identifies this remote in the project's sync bookkeeping.
     key: String,
+}
+
+struct FolderBlobs<'a>(&'a Path);
+
+impl BlobSource for FolderBlobs<'_> {
+    fn available(&self, sha256: &str) -> Result<bool> {
+        let blob = self.0.join(sha256);
+        // The drive may not have finished bringing it down yet.
+        Ok(is_sha256(sha256) && blob.is_file() && hash_file(&blob)? == sha256)
+    }
+
+    fn fetch(&self, sha256: &str, dest: &Path) -> Result<()> {
+        copy_atomic(&self.0.join(sha256), dest)
+    }
 }
 
 impl FolderRemote {
@@ -83,11 +75,7 @@ impl FolderRemote {
                 shared.display()
             )));
         }
-        if project_id.is_empty()
-            || !project_id
-                .chars()
-                .all(|c| c.is_ascii_alphanumeric() || c == '-')
-        {
+        if !valid_project_id(project_id) {
             return Err(SyncError::Invalid("the project id is not valid".into()));
         }
         let root = shared.join(project_id);
@@ -122,11 +110,7 @@ impl FolderRemote {
         fs::create_dir_all(own.join("changes")).map_err(io_error(&own))?;
         fs::create_dir_all(own.join("files")).map_err(io_error(&own))?;
 
-        // Content made before sync was switched on goes out with the first sync.
-        if store.sync_setting("snapshot_done")?.is_none() {
-            store.snapshot_unlogged()?;
-            store.set_sync_setting("snapshot_done", Some("1"))?;
-        }
+        crate::snapshot_once(store)?;
         report.sent = self.push_changes(store, &own)?;
         report.files_sent = self.push_files(store, project_root, &own, who)?;
         write_atomic(
@@ -140,12 +124,21 @@ impl FolderRemote {
             .unwrap_or_default(),
         )?;
 
+        let mut notices = Vec::new();
         for peer in self.peers(&device)? {
             let dir = self.root.join("devices").join(&peer.device);
             self.pull_changes(store, &dir, &mut report)?;
-            self.pull_files(store, project_root, &dir, &peer, &mut report)?;
+            notices.extend(read_notices(&dir));
             report.peers.push(peer);
         }
+        files::receive(
+            store,
+            project_root,
+            &self.key,
+            notices,
+            &FolderBlobs(&self.root.join("blobs")),
+            &mut report,
+        )?;
         report.applied += store.retry_pending()?;
         report.pending = store.sync_counts()?.pending as usize;
         Ok(report)
@@ -158,7 +151,8 @@ impl FolderRemote {
                 .sync_cursor(&self.key, "sent")?
                 .and_then(|p| p.parse().ok())
                 .unwrap_or(0);
-            let batch = store.local_changes_after(after, BATCH)?;
+            // Own changes, and what arrived through another remote (a server, say).
+            let batch = store.changes_to_send(after, &self.key, false, BATCH)?;
             let (Some((first, _)), Some((last, _))) = (batch.first(), batch.last()) else {
                 return Ok(sent);
             };
@@ -177,8 +171,6 @@ impl FolderRemote {
         }
     }
 
-    /// Publishes the latest revision of each shared file, when the file on disk is still
-    /// that revision.
     fn push_files(
         &self,
         store: &Store,
@@ -186,52 +178,20 @@ impl FolderRemote {
         own: &Path,
         who: &Identity,
     ) -> Result<usize> {
-        let latest: Vec<(String, String, String, String)> = {
-            let mut statement = store.connection().prepare(
-                "SELECT f.rel_path, f.kind, r.source_sha256, r.imported_at FROM revision r
-                 JOIN file f ON f.id = r.file_id
-                 WHERE r.idx = (SELECT MAX(idx) FROM revision WHERE file_id = r.file_id)",
-            )?;
-            let rows =
-                statement.query_map([], |r| Ok((r.get(0)?, r.get(1)?, r.get(2)?, r.get(3)?)))?;
-            rows.collect::<std::result::Result<_, _>>()
-                .map_err(kp_store::StoreError::from)?
-        };
-        let mut sent = 0;
-        for (rel_path, kind, sha, imported_at) in latest {
-            if !SHARED_KINDS.contains(&kind.as_str()) || store.is_published(&self.key, &sha)? {
-                continue;
-            }
-            let Some(relative) = safe_relative(&rel_path) else {
-                continue;
-            };
-            let path = project_root.join(relative);
-            if !path.is_file() || hash_file(&path)? != sha {
-                // Changed since it was imported; it goes out after the next import.
-                continue;
-            }
-            let blob = self.root.join("blobs").join(&sha);
+        let outgoing = files::outgoing(store, project_root, &self.key, &who.user)?;
+        for file in &outgoing {
+            let sha = &file.notice.sha256;
+            let blob = self.root.join("blobs").join(sha);
             if !blob.exists() {
-                copy_atomic(&path, &blob)?;
+                copy_atomic(&file.path, &blob)?;
             }
-            let size = fs::metadata(&path).map(|m| m.len()).unwrap_or(0);
-            let notice = FileNotice {
-                rel_path: rel_path.replace('\\', "/"),
-                sha256: sha.clone(),
-                kind,
-                size,
-                user: who.user.clone(),
-                published_at: now_rfc3339(),
-                imported_at: Some(imported_at),
-            };
             write_atomic(
                 &own.join("files").join(format!("{sha}.json")),
-                &serde_json::to_vec_pretty(&notice).unwrap_or_default(),
+                &serde_json::to_vec_pretty(&file.notice).unwrap_or_default(),
             )?;
-            store.mark_published(&self.key, &sha)?;
-            sent += 1;
+            store.mark_published(&self.key, sha)?;
         }
-        Ok(sent)
+        Ok(outgoing.len())
     }
 
     /// The other copies that have synced here.
@@ -300,217 +260,36 @@ impl FolderRemote {
             let Some(changes) = changes else {
                 continue;
             };
-            let applied = store.apply_changes(&changes)?;
+            let applied = store.apply_changes_from(&changes, &self.key)?;
             report.applied += applied.applied;
             report.skipped += applied.skipped;
             store.mark_published(&read_key, &marker)?;
         }
         Ok(())
     }
+}
 
-    fn pull_files(
-        &self,
-        store: &Store,
-        project_root: &Path,
-        dir: &Path,
-        peer: &Peer,
-        report: &mut SyncReport,
-    ) -> Result<()> {
-        let read_key = format!("{}#files", self.key);
-        let mut notices: Vec<FileNotice> = match fs::read_dir(dir.join("files")) {
-            Ok(entries) => entries
-                .flatten()
-                .filter(|e| e.file_name().to_string_lossy().ends_with(".json"))
-                .filter_map(|e| fs::read(e.path()).ok())
-                .filter_map(|b| serde_json::from_slice(&b).ok())
-                .collect(),
-            Err(_) => return Ok(()),
-        };
-        notices.sort_by(|a, b| a.published_at.cmp(&b.published_at));
-        // Only the newest unseen version of each path is worth copying.
-        let mut newest: Vec<FileNotice> = Vec::new();
-        for notice in notices {
-            if store.is_published(&read_key, &notice.sha256)? {
-                continue;
-            }
-            if let Some(i) = newest.iter().position(|n| n.rel_path == notice.rel_path) {
-                store.mark_published(&read_key, &newest[i].sha256)?;
-                newest[i] = notice;
-            } else {
-                newest.push(notice);
-            }
-        }
-
-        for notice in newest {
-            let known: bool = store.connection().query_row(
-                "SELECT EXISTS (SELECT 1 FROM revision WHERE source_sha256 = ?1)",
-                [&notice.sha256],
-                |r| r.get(0),
-            )?;
-            // Marked read once its revision exists here (above), so an import that was
-            // interrupted is offered again by the next sync.
-            let done = |store: &Store| store.mark_published(&read_key, &notice.sha256);
-            if known {
-                done(store)?;
-                // Do not publish it back.
-                store.mark_published(&self.key, &notice.sha256)?;
-                continue;
-            }
-            let Some(relative) = safe_relative(&notice.rel_path) else {
-                done(store)?;
-                continue;
-            };
-            let blob = self.root.join("blobs").join(&notice.sha256);
-            if !blob.is_file() || hash_file(&blob)? != notice.sha256 {
-                // The drive has not finished bringing it down yet.
-                continue;
-            }
-            store.mark_published(&self.key, &notice.sha256)?;
-            let target = project_root.join(&relative);
-            let received = |rel_path: String| ReceivedFile {
-                rel_path,
-                kind: notice.kind.clone(),
-                from_user: peer.user.clone(),
-            };
-            if target.is_file() {
-                let current = hash_file(&target)?;
-                let imported_here: Option<String> = store.connection().query_row(
-                    "SELECT MAX(imported_at) FROM revision WHERE source_sha256 = ?1",
-                    [&current],
-                    |r| r.get(0),
-                )?;
-                if current == notice.sha256 {
-                    // Copied by an earlier sync and not imported yet.
-                    report
-                        .received_files
-                        .push(received(notice.rel_path.clone()));
-                } else if let Some(imported_here) = imported_here {
-                    let theirs = notice
-                        .imported_at
-                        .as_deref()
-                        .unwrap_or(&notice.published_at);
-                    if imported_here.as_str() > theirs {
-                        // A newer version was imported here since; theirs is older.
-                        done(store)?;
-                        continue;
-                    }
-                    copy_atomic(&blob, &target)?;
-                    report
-                        .received_files
-                        .push(received(notice.rel_path.clone()));
-                } else {
-                    // Changed here too and not imported: keep both.
-                    let beside = beside_name(&relative, &peer.user);
-                    copy_atomic(&blob, &project_root.join(&beside))?;
-                    let beside = beside.to_string_lossy().replace('\\', "/");
-                    report.conflicts.push(format!(
-                        "{} was changed here and by {}; their version is saved as {}",
-                        notice.rel_path,
-                        display_user(&peer.user),
-                        beside
-                    ));
-                    report.received_files.push(received(beside));
-                    done(store)?;
-                }
-            } else {
-                if let Some(parent) = target.parent() {
-                    fs::create_dir_all(parent).map_err(io_error(parent))?;
-                }
-                copy_atomic(&blob, &target)?;
-                report
-                    .received_files
-                    .push(received(notice.rel_path.clone()));
-            }
-        }
-        Ok(())
+fn read_notices(dir: &Path) -> Vec<FileNotice> {
+    match fs::read_dir(dir.join("files")) {
+        Ok(entries) => entries
+            .flatten()
+            .filter(|e| e.file_name().to_string_lossy().ends_with(".json"))
+            .filter_map(|e| fs::read(e.path()).ok())
+            .filter_map(|b| serde_json::from_slice(&b).ok())
+            .collect(),
+        Err(_) => Vec::new(),
     }
-}
-
-fn display_user(user: &str) -> &str {
-    if user.is_empty() {
-        "another computer"
-    } else {
-        user
-    }
-}
-
-/// `models/frame.ifc` → `models/frame (from Sam).ifc`.
-fn beside_name(relative: &Path, user: &str) -> PathBuf {
-    let stem = relative
-        .file_stem()
-        .map(|s| s.to_string_lossy().into_owned())
-        .unwrap_or_default();
-    let clean: String = display_user(user)
-        .chars()
-        .filter(|c| c.is_alphanumeric() || *c == ' ' || *c == '-' || *c == '_')
-        .collect();
-    let name = match relative.extension() {
-        Some(ext) => format!("{stem} (from {clean}).{}", ext.to_string_lossy()),
-        None => format!("{stem} (from {clean})"),
-    };
-    relative.with_file_name(name)
-}
-
-pub(crate) fn hash_file(path: &Path) -> Result<String> {
-    let mut file = fs::File::open(path).map_err(io_error(path))?;
-    let mut hasher = Sha256::new();
-    let mut buffer = vec![0u8; 1 << 20];
-    loop {
-        let read = file.read(&mut buffer).map_err(io_error(path))?;
-        if read == 0 {
-            break;
-        }
-        hasher.update(&buffer[..read]);
-    }
-    Ok(hex(&hasher.finalize()))
-}
-
-fn temp_name(path: &Path) -> PathBuf {
-    let name = path
-        .file_name()
-        .map(|n| n.to_string_lossy().into_owned())
-        .unwrap_or_default();
-    path.with_file_name(format!(".{name}.part"))
-}
-
-fn write_atomic(path: &Path, bytes: &[u8]) -> Result<()> {
-    let temp = temp_name(path);
-    fs::write(&temp, bytes).map_err(io_error(&temp))?;
-    fs::rename(&temp, path).map_err(io_error(path))
-}
-
-fn copy_atomic(from: &Path, to: &Path) -> Result<()> {
-    let temp = temp_name(to);
-    fs::copy(from, &temp).map_err(io_error(&temp))?;
-    fs::rename(&temp, to).map_err(io_error(to))
 }
 
 #[cfg(test)]
 mod tests {
+    use sha2::{Digest, Sha256};
+
     use super::*;
-
-    struct Copy {
-        _dir: tempfile::TempDir,
-        root: PathBuf,
-        store: Store,
-        who: Identity,
-    }
-
-    fn copy(user: &str) -> Copy {
-        let dir = tempfile::tempdir().unwrap();
-        let root = dir.path().to_path_buf();
-        fs::create_dir_all(root.join(".kingpost")).unwrap();
-        let store = Store::open(&root.join(".kingpost").join("project.db")).unwrap();
-        Copy {
-            _dir: dir,
-            root,
-            store,
-            who: Identity {
-                user: user.into(),
-                machine: format!("{user}-pc"),
-            },
-        }
-    }
+    use crate::{
+        ReceivedFile, hex,
+        testing::{Copy, copy},
+    };
 
     fn sync(c: &Copy, shared: &Path) -> SyncReport {
         FolderRemote::open(shared, "p-1", "Bridge")
@@ -519,43 +298,13 @@ mod tests {
             .unwrap()
     }
 
-    /// What an import does to the database, without parsing the file.
-    fn import(c: &Copy, rel_path: &str, kind: &str) {
-        let sha = hash_file(&c.root.join(rel_path)).unwrap();
-        let conn = c.store.connection();
-        conn.execute(
-            "INSERT INTO file (rel_path, kind, sha256) VALUES (?1, ?2, ?3)
-             ON CONFLICT(rel_path) DO UPDATE SET sha256 = excluded.sha256",
-            [rel_path, kind, &sha],
-        )
-        .unwrap();
-        conn.execute(
-            "INSERT INTO revision (file_id, idx, source_sha256)
-             SELECT id, (SELECT COUNT(*) FROM revision WHERE file_id = file.id) + 1, ?2
-             FROM file WHERE rel_path = ?1",
-            [rel_path, &sha],
-        )
-        .unwrap();
-    }
-
-    fn write(c: &Copy, rel_path: &str, text: &str) {
-        let path = c.root.join(rel_path);
-        fs::create_dir_all(path.parent().unwrap()).unwrap();
-        fs::write(path, text).unwrap();
-    }
-
     #[test]
     fn changes_and_files_reach_the_other_copy() {
         let shared = tempfile::tempdir().unwrap();
         let (ann, sam) = (copy("Ann"), copy("Sam"));
-        write(&ann, "models/frame.ifc", "ISO-10303-21; frame v1");
-        import(&ann, "models/frame.ifc", "ifc");
-        ann.store
-            .connection()
-            .execute_batch(
-                "INSERT INTO issue (id, bcf_guid, title, created_by) VALUES ('i1', 'g1', 'Check B12', 'Ann');",
-            )
-            .unwrap();
+        ann.write("models/frame.ifc", "ISO-10303-21; frame v1");
+        ann.import("models/frame.ifc", "ifc");
+        ann.sql("INSERT INTO issue (id, bcf_guid, title, created_by) VALUES ('i1', 'g1', 'Check B12', 'Ann');");
 
         let first = sync(&ann, shared.path());
         assert_eq!((first.sent, first.files_sent), (1, 1));
@@ -572,19 +321,11 @@ mod tests {
                 from_user: "Ann".into()
             }]
         );
-        assert_eq!(
-            fs::read_to_string(sam.root.join("models/frame.ifc")).unwrap(),
-            "ISO-10303-21; frame v1"
-        );
-        let title: String = sam
-            .store
-            .connection()
-            .query_row("SELECT title FROM issue", [], |r| r.get(0))
-            .unwrap();
-        assert_eq!(title, "Check B12");
+        assert_eq!(sam.read("models/frame.ifc"), "ISO-10303-21; frame v1");
+        assert_eq!(sam.text("SELECT title FROM issue"), "Check B12");
 
         // Nothing new: nothing moves, and Sam does not send Ann's file back.
-        import(&sam, "models/frame.ifc", "ifc");
+        sam.import("models/frame.ifc", "ifc");
         let quiet = sync(&sam, shared.path());
         assert_eq!((quiet.sent, quiet.files_sent, quiet.applied), (0, 0, 0));
         assert!(quiet.received_files.is_empty());
@@ -596,35 +337,48 @@ mod tests {
     fn a_new_version_replaces_an_imported_file() {
         let shared = tempfile::tempdir().unwrap();
         let (ann, sam) = (copy("Ann"), copy("Sam"));
-        write(&ann, "frame.ifc", "v1");
-        import(&ann, "frame.ifc", "ifc");
+        ann.write("frame.ifc", "v1");
+        ann.import("frame.ifc", "ifc");
         sync(&ann, shared.path());
         sync(&sam, shared.path());
-        import(&sam, "frame.ifc", "ifc");
+        sam.import("frame.ifc", "ifc");
 
-        write(&ann, "frame.ifc", "v2");
-        import(&ann, "frame.ifc", "ifc");
+        ann.write("frame.ifc", "v2");
+        ann.import("frame.ifc", "ifc");
         sync(&ann, shared.path());
         let report = sync(&sam, shared.path());
         assert_eq!(report.received_files.len(), 1);
         assert!(report.conflicts.is_empty());
-        assert_eq!(
-            fs::read_to_string(sam.root.join("frame.ifc")).unwrap(),
-            "v2"
-        );
+        assert_eq!(sam.read("frame.ifc"), "v2");
+    }
+
+    #[test]
+    fn the_newest_version_wins_across_copies() {
+        let shared = tempfile::tempdir().unwrap();
+        let (ann, sam, kim) = (copy("Ann"), copy("Sam"), copy("Kim"));
+        ann.write("frame.ifc", "ann's version");
+        ann.import("frame.ifc", "ifc");
+        sync(&ann, shared.path());
+        std::thread::sleep(std::time::Duration::from_millis(20));
+        sam.write("frame.ifc", "sam's later version");
+        sam.import("frame.ifc", "ifc");
+        sync(&sam, shared.path());
+        let report = sync(&kim, shared.path());
+        assert_eq!(report.received_files.len(), 1);
+        assert_eq!(kim.read("frame.ifc"), "sam's later version");
     }
 
     #[test]
     fn an_interrupted_import_is_offered_again() {
         let shared = tempfile::tempdir().unwrap();
         let (ann, sam) = (copy("Ann"), copy("Sam"));
-        write(&ann, "frame.ifc", "v1");
-        import(&ann, "frame.ifc", "ifc");
+        ann.write("frame.ifc", "v1");
+        ann.import("frame.ifc", "ifc");
         sync(&ann, shared.path());
         assert_eq!(sync(&sam, shared.path()).received_files.len(), 1);
         // Sam's import never happened: the next sync asks again.
         assert_eq!(sync(&sam, shared.path()).received_files.len(), 1);
-        import(&sam, "frame.ifc", "ifc");
+        sam.import("frame.ifc", "ifc");
         assert!(sync(&sam, shared.path()).received_files.is_empty());
     }
 
@@ -632,42 +386,30 @@ mod tests {
     fn an_older_version_does_not_replace_a_newer_import() {
         let shared = tempfile::tempdir().unwrap();
         let (ann, sam) = (copy("Ann"), copy("Sam"));
-        write(&ann, "frame.ifc", "ann v1");
-        import(&ann, "frame.ifc", "ifc");
+        ann.write("frame.ifc", "ann v1");
+        ann.import("frame.ifc", "ifc");
         // Pretend Ann imported it long ago.
-        ann.store
-            .connection()
-            .execute_batch("UPDATE revision SET imported_at = '2020-01-01T00:00:00.000Z';")
-            .unwrap();
+        ann.sql("UPDATE revision SET imported_at = '2020-01-01T00:00:00.000Z';");
         sync(&ann, shared.path());
-        write(&sam, "frame.ifc", "sam v2");
-        import(&sam, "frame.ifc", "ifc");
+        sam.write("frame.ifc", "sam v2");
+        sam.import("frame.ifc", "ifc");
         let report = sync(&sam, shared.path());
         assert!(report.received_files.is_empty() && report.conflicts.is_empty());
-        assert_eq!(
-            fs::read_to_string(sam.root.join("frame.ifc")).unwrap(),
-            "sam v2"
-        );
+        assert_eq!(sam.read("frame.ifc"), "sam v2");
     }
 
     #[test]
     fn a_file_changed_on_both_sides_is_kept_twice() {
         let shared = tempfile::tempdir().unwrap();
         let (ann, sam) = (copy("Ann"), copy("Sam"));
-        write(&ann, "frame.ifc", "ann's");
-        import(&ann, "frame.ifc", "ifc");
+        ann.write("frame.ifc", "ann's");
+        ann.import("frame.ifc", "ifc");
         sync(&ann, shared.path());
-        write(&sam, "frame.ifc", "sam's, not imported yet");
+        sam.write("frame.ifc", "sam's, not imported yet");
         let report = sync(&sam, shared.path());
         assert_eq!(report.conflicts.len(), 1);
-        assert_eq!(
-            fs::read_to_string(sam.root.join("frame.ifc")).unwrap(),
-            "sam's, not imported yet"
-        );
-        assert_eq!(
-            fs::read_to_string(sam.root.join("frame (from Ann).ifc")).unwrap(),
-            "ann's"
-        );
+        assert_eq!(sam.read("frame.ifc"), "sam's, not imported yet");
+        assert_eq!(sam.read("frame (from Ann).ifc"), "ann's");
         assert_eq!(report.received_files[0].rel_path, "frame (from Ann).ifc");
     }
 
@@ -675,42 +417,22 @@ mod tests {
     fn edits_cross_in_both_directions() {
         let shared = tempfile::tempdir().unwrap();
         let (ann, sam) = (copy("Ann"), copy("Sam"));
-        ann.store
-            .connection()
-            .execute_batch(
-                "INSERT INTO note (id, point_json, text) VALUES ('n1', '[0,0,0]', 'Ann''s note');",
-            )
-            .unwrap();
-        sam.store
-            .connection()
-            .execute_batch(
-                "INSERT INTO note (id, point_json, text) VALUES ('n2', '[1,0,0]', 'Sam''s note');",
-            )
-            .unwrap();
+        ann.sql("INSERT INTO note (id, point_json, text) VALUES ('n1', '[0,0,0]', 'Ann''s note');");
+        sam.sql("INSERT INTO note (id, point_json, text) VALUES ('n2', '[1,0,0]', 'Sam''s note');");
         sync(&ann, shared.path());
         sync(&sam, shared.path());
         sync(&ann, shared.path());
-        for c in [&ann, &sam] {
-            let count: i64 = c
-                .store
-                .connection()
-                .query_row("SELECT COUNT(*) FROM note", [], |r| r.get(0))
-                .unwrap();
-            assert_eq!(count, 2);
-        }
+        assert_eq!((ann.count("note"), sam.count("note")), (2, 2));
     }
 
     #[test]
     fn content_from_before_sync_is_sent_once() {
         let shared = tempfile::tempdir().unwrap();
         let ann = copy("Ann");
-        ann.store
-            .connection()
-            .execute_batch(
-                "INSERT INTO note (id, point_json, text) VALUES ('n1', '[0,0,0]', 'old');
-                 DELETE FROM change_log;",
-            )
-            .unwrap();
+        ann.sql(
+            "INSERT INTO note (id, point_json, text) VALUES ('n1', '[0,0,0]', 'old');
+             DELETE FROM change_log;",
+        );
         assert_eq!(sync(&ann, shared.path()).sent, 1);
         assert_eq!(sync(&ann, shared.path()).sent, 0);
     }

@@ -6,6 +6,13 @@ license-file.workspace = true
 publish.workspace = true
 description = "Sync transports for KingPost Connect projects: shared folder and sync server"
 
+[features]
+default = ["client"]
+# The desktop side of server sync (HTTP client). The server itself only needs the protocol.
+client = ["dep:reqwest", "dep:rustls"]
+# Project copies on disk for tests of the transports, here and in the server's tests.
+testing = ["dep:tempfile"]
+
 [dependencies]
 kp-store = { path = "../kp-store" }
 rusqlite.workspace = true
@@ -14,6 +21,19 @@ serde_json.workspace = true
 sha2.workspace = true
 thiserror.workspace = true
 time.workspace = true
+tempfile = { workspace = true, optional = true }
+# The same HTTP stack the updater already uses: rustls with the ring provider, no OpenSSL.
+reqwest = { version = "0.13", optional = true, default-features = false, features = [
+  "blocking",
+  "json",
+  "rustls-no-provider",
+  "system-proxy",
+] }
+rustls = { version = "0.23", optional = true, default-features = false, features = [
+  "ring",
+  "std",
+  "tls12",
+] }
 
 [dev-dependencies]
 tempfile.workspace = true

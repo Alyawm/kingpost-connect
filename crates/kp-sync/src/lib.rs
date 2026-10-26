@@ -7,8 +7,18 @@
 //! - [`folder`]: any folder all copies can reach — a OneDrive, Dropbox or Google Drive
 //!   folder, or a network share. Each copy writes only its own files there, so the cloud
 //!   drive never has two writers on one file.
+//! - [`server`] (feature `client`): a KingPost Connect sync server, with accounts and
+//!   projects shared by invitation. [`protocol`] describes what is said to it.
+//!
+//! Receiving files works the same for both ([`files`]).
 
+pub mod files;
 pub mod folder;
+pub mod protocol;
+#[cfg(feature = "client")]
+pub mod server;
+#[cfg(any(test, feature = "testing"))]
+pub mod testing;
 
 use std::{io, path::PathBuf};
 
@@ -26,6 +36,19 @@ pub enum SyncError {
     Store(#[from] kp_store::StoreError),
     #[error("{0}")]
     Invalid(String),
+    /// The server could not be reached or did not answer as expected.
+    #[error("{0}")]
+    Network(String),
+    /// The server refused the request; the message is the server's.
+    #[error("{message}")]
+    Server { status: u16, message: String },
+}
+
+impl SyncError {
+    /// The server no longer accepts this sign-in.
+    pub fn is_unauthorized(&self) -> bool {
+        matches!(self, SyncError::Server { status: 401, .. })
+    }
 }
 
 impl From<rusqlite::Error> for SyncError {
@@ -39,6 +62,13 @@ pub type Result<T> = std::result::Result<T, SyncError>;
 pub(crate) fn io_error(path: impl Into<PathBuf>) -> impl FnOnce(io::Error) -> SyncError {
     let path = path.into();
     move |source| SyncError::Io { path, source }
+}
+
+/// Who is syncing, shown to the other copies.
+#[derive(Debug, Clone)]
+pub struct Identity {
+    pub user: String,
+    pub machine: String,
 }
 
 /// A model or drawing file received from another copy, now in the project folder and
@@ -73,6 +103,22 @@ pub struct SyncReport {
     /// Messages about files changed both here and elsewhere.
     pub conflicts: Vec<String>,
     pub peers: Vec<Peer>,
+    /// The user's role in the project, when syncing with a server.
+    pub role: Option<String>,
+}
+
+/// Content made before sync was switched on is recorded once, so the first sync sends it.
+pub(crate) fn snapshot_once(store: &kp_store::Store) -> Result<()> {
+    if store.sync_setting("snapshot_done")?.is_none() {
+        store.snapshot_unlogged()?;
+        store.set_sync_setting("snapshot_done", Some("1"))?;
+    }
+    Ok(())
+}
+
+/// Project ids are UUIDs; anything else is refused before it becomes a folder or URL part.
+pub fn valid_project_id(id: &str) -> bool {
+    !id.is_empty() && id.len() <= 64 && id.chars().all(|c| c.is_ascii_alphanumeric() || c == '-')
 }
 
 pub(crate) fn now_rfc3339() -> String {
@@ -83,6 +129,11 @@ pub(crate) fn now_rfc3339() -> String {
 
 pub(crate) fn hex(bytes: &[u8]) -> String {
     bytes.iter().map(|b| format!("{b:02x}")).collect()
+}
+
+/// Whether a project-relative path from another machine stays inside the project.
+pub fn is_safe_relative(rel_path: &str) -> bool {
+    safe_relative(rel_path).is_some()
 }
 
 /// A project-relative path from another machine, checked to stay inside the project.
@@ -114,5 +165,12 @@ mod tests {
         assert!(safe_relative("C:/Windows/x.ifc").is_none());
         assert!(safe_relative(".kingpost/project.db").is_none());
         assert!(safe_relative("").is_none());
+    }
+
+    #[test]
+    fn project_ids_are_plain() {
+        assert!(valid_project_id("42d884a8-d22c-47d0-860b-6597a3eb2e49"));
+        assert!(!valid_project_id("../p"));
+        assert!(!valid_project_id(""));
     }
 }
