@@ -12,12 +12,15 @@ Pushing a tag `vX.Y.Z` runs `.github/workflows/release.yml`:
 2. `windows-installer`: builds the NSIS and MSI installers and the updater artifacts
    (`*.nsis.zip`, `*.sig`, `latest.json`) and attaches them to a **draft** GitHub Release
    named after the tag. Nothing is published until a person reviews the draft and
-   presses Publish.
+   presses Publish. It then builds the sync server for Windows with the web viewer and
+   attaches `kingpost-server-vX.Y.Z-windows-x64.zip` (program, `web` folder, and
+   `docs/server.md` as README).
+3. `linux-server`: the same for Linux, `kingpost-server-vX.Y.Z-linux-x64.tar.gz`.
 
 Keep the version in step before tagging: `package.json`, `apps/desktop/package.json`,
-`apps/desktop/src-tauri/tauri.conf.json`, `Cargo.toml` (workspace), `packages/*/package.json`
-and `Cargo.lock` (run `cargo update -w --offline`). The CHANGELOG heading for the version
-is the release note.
+`apps/web/package.json`, `apps/desktop/src-tauri/tauri.conf.json`, `Cargo.toml`
+(workspace), `packages/*/package.json` and `Cargo.lock` (run `cargo update -w --offline`).
+The CHANGELOG heading for the version is the release note.
 
 ## Plugin versions
 

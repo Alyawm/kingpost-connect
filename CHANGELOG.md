@@ -3,6 +3,26 @@
 All notable changes to KingPost Connect. The format follows Keep a Changelog; versions
 follow semantic versioning. Milestone tags match the headings below.
 
+## [2.0.0] — 2026-10-26 — Sync server and web viewer
+
+### Added
+- KingPost Connect server (`kingpost-server`, Windows and Linux): accounts, projects shared
+  by invitation with owner, editor and viewer roles, change relay and file store; the first
+  account is the administrator, and only invited people can sign up unless sign-up is
+  opened. Command line for adding users and setting passwords. See `docs/server.md`.
+- Sync with a server from the Sync panel: sign in or create an account, invite colleagues
+  by email with a role, remove access or leave, sign out. Unencrypted addresses are flagged.
+- Join a project from a server on the Projects page, besides joining from a shared folder.
+- Web viewer served by the server: sign in, open a shared project, view its latest model,
+  issues with viewpoints, comments and highlighted elements; editors comment and change
+  status. Works on phones.
+- The server program with the web viewer is attached to each release.
+
+### Changed
+- A project that moves from a shared folder to a server passes on the edits it received
+  through the folder (migration 011 records where each change came from).
+- Received files: the newest version across all copies wins.
+
 ## [1.9.0] — 2026-10-26 — Sync through a shared folder
 
 ### Added

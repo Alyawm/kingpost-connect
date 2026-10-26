@@ -1,7 +1,10 @@
 # Runs only when a milestone tag (v*) is pushed, to stay inside the free Actions allowance.
 # 1. check: typecheck, lint, tests for both the web and Rust sides, on Linux (cheapest runner).
 # 2. windows-installer: builds the NSIS and MSI installers and attaches them to a draft
-#    GitHub Release named after the tag. The release is published by hand after review.
+#    GitHub Release named after the tag, then the sync server for Windows with the web
+#    viewer. The release is published by hand after review.
+# 3. linux-server: the sync server for Linux with the web viewer, attached to the same
+#    draft release.
 name: release
 
 on:
@@ -78,3 +81,51 @@ jobs:
           releaseBody: 'See CHANGELOG.md for the changes in this milestone.'
           releaseDraft: true
           prerelease: ${{ contains(github.ref_name, '-') }}
+
+      - name: Build the sync server and the web viewer
+        shell: bash
+        run: |
+          pnpm --filter @kingpost/web build
+          cargo build -p kp-server --release
+          mkdir -p dist-server/kingpost-server/web
+          cp target/release/kingpost-server.exe dist-server/kingpost-server/
+          cp -r apps/web/dist/. dist-server/kingpost-server/web/
+          cp docs/server.md dist-server/kingpost-server/README.md
+          cd dist-server && 7z a "../kingpost-server-${{ github.ref_name }}-windows-x64.zip" kingpost-server
+
+      - name: Attach the server to the release
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: gh release upload "${{ github.ref_name }}" "kingpost-server-${{ github.ref_name }}-windows-x64.zip" --clobber
+
+  linux-server:
+    # After the installers, so the draft release exists to attach to.
+    needs: windows-installer
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+
+      - run: pnpm install --frozen-lockfile
+
+      - name: Build the sync server and the web viewer
+        run: |
+          pnpm --filter @kingpost/web build
+          cargo build -p kp-server --release
+          mkdir -p kingpost-server/web
+          cp target/release/kingpost-server kingpost-server/
+          cp -r apps/web/dist/. kingpost-server/web/
+          cp docs/server.md kingpost-server/README.md
+          tar czf "kingpost-server-${{ github.ref_name }}-linux-x64.tar.gz" kingpost-server
+
+      - name: Attach the server to the release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: gh release upload "${{ github.ref_name }}" "kingpost-server-${{ github.ref_name }}-linux-x64.tar.gz" --clobber

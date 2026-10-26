@@ -23,6 +23,7 @@ Read them in order to understand why the code looks the way it does.
 | [012](012-section-planes.md) | Section planes as point and normal toward the removed side; handles drawn in a second pass | Accepted |
 | [013](013-reference-models.md) | One main model with full features; reference models aligned by their IFC frames | Accepted |
 | [014](014-sync-change-log.md) | Sync by a per-row change log recorded with triggers; shared folders as the first transport | Accepted |
+| [015](015-sync-server-and-web-viewer.md) | A self-hosted relay server on the same change log; the web viewer rebuilds state in the browser | Accepted |
 
 ## Template
 

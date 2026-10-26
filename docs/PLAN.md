@@ -244,12 +244,15 @@ Durations assume **2 developers** (one Rust/backend‑leaning, one React/3D‑le
 
 ### Phase 9 — Cloud & sync (post‑v1)
 
-> Status 2026‑10‑26: change‑log sync done and tagged `v1.9.0`: every change to shared
-> content is recorded per row with a hybrid logical clock, copies exchange changes and
-> files through a shared folder (OneDrive, Dropbox, Google Drive, network share), newest
-> edit wins per row, files changed on both sides are kept twice, and a project can be
-> joined from the shared folder. Open: sync server with accounts and sharing by
-> invitation, web viewer. See `docs/devlog/2026-10-phase9-sync.md` and ADR 014.
+> Status 2026‑10‑26: done. `v1.9.0`: every change to shared content is recorded per row
+> with a hybrid logical clock; copies exchange changes and files through a shared folder
+> (OneDrive, Dropbox, Google Drive, network share), newest edit wins per row, files changed
+> on both sides are kept twice, and a project can be joined from the shared folder.
+> `v2.0.0`: self-hosted sync server with accounts, sharing by invitation (owner, editor,
+> viewer), the same change log relayed, and a web viewer (model, issues, viewpoints,
+> comments) reusing the viewer package. Open: log compaction, email for invitations. See
+> `docs/devlog/2026-10-phase9-sync.md`, `docs/devlog/2026-10-phase9-server-web.md`,
+> ADR 014 and ADR 015.
 - Account service, project sharing, change‑log based sync, web viewer reusing the same React/three.js code.
 
 ## 6. Risks and how we handle them
@@ -269,6 +272,7 @@ Durations assume **2 developers** (one Rust/backend‑leaning, one React/3D‑le
 ```
 kingpost-connect/
   apps/desktop/            Tauri app (src-tauri/ Rust, src/ React)
+  apps/web/                web viewer served by the sync server (Phase 9)
   packages/ui/             shared components, tokens
   packages/viewer/         three.js + That Open wrappers, fragments loader
   packages/review/         BCF UI, status pipeline
@@ -276,6 +280,7 @@ kingpost-connect/
   packages/drawings/       pdf.js viewer, markups, links
   packages/schedules/      (Phase 8, optional)
   crates/kp-project  kp-ifc  kp-store  kp-bcf  kp-diff  kp-analysis  kp-drawings  [kp-quantity]
+  crates/kp-sync  kp-server  (Phase 9: sync transports; the sync server)
   samples/                 small IFC / SAF / e2k / PDF files; large ones via Releases
   docs/adr/                architecture decision records (numbered)
   docs/devlog/             one page per milestone: what was built, why, what's next

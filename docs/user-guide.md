@@ -3,9 +3,9 @@
 KingPost Connect is a desktop application for structural engineers: open IFC models,
 review them element by element, compare revisions, overlay analysis models, link PDF
 drawings to the model and run clash checks. Everything stays in a project folder on your
-computer. To work with colleagues, copies of a project sync through a shared folder you
-choose (see "Working together"); the application itself makes no network connection
-unless you ask it to check for an update.
+computer. To work with colleagues, copies of a project sync through a shared folder or a
+KingPost Connect server you choose (see "Working together"); otherwise the application
+makes no network connection unless you ask it to check for an update.
 
 ## Projects
 
@@ -225,19 +225,32 @@ using the units the IFC file declares (millimetres, feet and so on).
 
 ## Working together
 
-Everyone works in their own copy of the project; the copies keep each other up to date
-through a folder all of you can reach: a OneDrive, SharePoint, Dropbox or Google Drive
-folder, or a network share.
+Everyone works in their own copy of the project, and the copies keep each other up to
+date. They can meet in two ways:
 
-**Start sharing.** Open the project, click the cloud button in the title bar and
-**Choose shared folder…**. The first sync sends the project's issues, comments,
-viewpoints, element statuses, views, notes, links, drawing links and markups, clash tests
-and their reviews, presets and densities, and publishes the model, drawing and analysis
-files.
+- a **shared folder** all of you can reach: a OneDrive, SharePoint, Dropbox or Google Drive
+  folder, or a network share. No accounts; anyone who can open the folder can join.
+- a **KingPost Connect server** your firm runs (see `docs/server.md`): people sign in,
+  owners invite colleagues by email as editors or viewers, and invited people can also
+  open the project in a web browser.
 
-**Join.** On the Projects page, **Join shared project…**: pick the same shared folder,
-then an empty folder for your copy. The first sync brings everything and imports the
-files.
+Either way, what travels is the project's issues, comments, viewpoints, element statuses,
+views, notes, links, drawing links and markups, clash tests and their reviews, presets and
+densities, and the model, drawing and analysis files.
+
+**Start sharing.** Open the project and click the cloud button in the title bar. Choose
+**Shared folder** and pick the folder, or **Server**, enter the server's address and sign
+in (or create your account). The first sync sends everything the project holds.
+
+**Invite (server).** In the Sync panel, under **People**, enter a colleague's email and
+choose **Editor** (changes the project), **Viewer** (sees it; their changes stay on their
+computer) or **Owner** (also manages access), then **Invite**. Someone without an account
+yet becomes a member when they create one with that email. The server sends no email, so
+tell them its address.
+
+**Join.** On the Projects page, **Join shared project…**, then **From a shared folder…**
+(pick the same folder) or **From a server** (sign in, then pick the project). Choose an
+empty folder for your copy; the first sync brings everything and imports the files.
 
 **Day to day.** With "Sync automatically" on, a project syncs when it opens and every two
 minutes; **Sync now** does it at once. Import a new revision of a model as usual; it goes
@@ -254,8 +267,18 @@ nothing is overwritten: the other version is saved beside yours, for example
 the reason, for example a markup on a drawing revision you never had. It is applied as
 soon as possible.
 
-**Stop syncing** keeps everything in your copy as it is. Each copy writes only its own
-files into the shared folder; do not edit or remove them by hand.
+**Moving to a server.** A project that synced through a shared folder can switch to a
+server at any time: choose **Server** in the Sync panel. What it received from the folder
+goes to the server too, so colleagues who join there see every edit.
+
+**Web viewer.** At the server's address, invited people sign in, open a project, see its
+latest model, read issues with their viewpoints and comments, show an issue's elements,
+comment and change an issue's status. It works on a phone too. Their comments reach your
+copy at its next sync.
+
+**Stop syncing** keeps everything in your copy as it is. **Sign out** (server) forgets
+your sign-in on this computer. With a shared folder, each copy writes only its own files
+there; do not edit or remove them by hand.
 
 ## Settings and help
 
